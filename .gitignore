@@ -1,0 +1,10 @@
+node_modules
+dist
+.vercel
+.DS_Store
+*.local
+
+# dev-only tooling / scratch
+harness.html
+.playwright-mcp
+bb-*.png
