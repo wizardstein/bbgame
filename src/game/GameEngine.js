@@ -192,16 +192,17 @@ export class GameEngine {
   };
   _gameOver() {
     this.playing = false;
-    const L = this._lang;
-    let rk = this.RANKS[0];
-    for (const r of this.RANKS) if (this.bricksCaught >= r.min) rk = r;
+    // pass the rank INDEX, not resolved strings, so the React shell can re-translate
+    // the rank title/blurb live when the language is toggled on the game-over screen.
+    let rkIdx = 0;
+    for (let i = 0; i < this.RANKS.length; i++) if (this.bricksCaught >= this.RANKS[i].min) rkIdx = i;
     const best = Math.max(this.best, this.score);
     this.best = best;
     try { localStorage.setItem("bbwb_best", String(best)); } catch (e) {}
     this.finalScore = this.score; this.finalBricks = this.bricksCaught; this.finalCombo = this.bestCombo;
     this.onScreen("over", {
       finalScore: this.score, finalBricks: this.bricksCaught, finalCombo: this.bestCombo,
-      rankTitle: rk[L][0], rankBlurb: rk[L][1], best,
+      rankIdx: rkIdx, best,
     });
   }
 
@@ -309,7 +310,7 @@ export class GameEngine {
   }
   _showCombo() {
     const el = this.hud.combo; if (!el) return;
-    el.textContent = "×" + this.comboMult + " combo!";
+    el.textContent = "×" + this.comboMult + (this._lang === "ro" ? " multiplicator" : " multiplier");
   }
   _updateHud() {
     if (this.hud.score) this.hud.score.textContent = this.score;
@@ -414,7 +415,7 @@ export class GameEngine {
     const L = this._lang;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillStyle = "#fff";
-    ctx.font = "600 " + Math.max(7, head * 0.54) + "px 'Fredoka', sans-serif";
+    ctx.font = "600 " + Math.max(7, head * 0.54) + "px 'Baloo 2', sans-serif";
     ctx.fillText("BEARD BROTHERS", base.sx, topY + head / 2);
     // body: icon column + text column
     const bodyY = topY + head, bodyH = bh - head, iconW = bw * 0.35;
@@ -428,7 +429,7 @@ export class GameEngine {
     // title
     ctx.fillStyle = "#2B2A28";
     const tsz = Math.max(8, bh * 0.135);
-    ctx.font = "700 " + tsz + "px 'Fredoka', sans-serif";
+    ctx.font = "700 " + tsz + "px 'Baloo 2', sans-serif";
     const lines = this._wrap(ctx, b.cm[L], tw);
     let ty = bodyY + bodyH * 0.33 - (lines.length > 1 ? tsz * 0.5 : 0);
     for (let i = 0; i < Math.min(lines.length, 2); i++) { ctx.fillText(lines[i], tx, ty); ty += tsz * 1.05; }

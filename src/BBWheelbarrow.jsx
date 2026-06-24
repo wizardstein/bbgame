@@ -19,7 +19,9 @@ const STR = {
     overNote: "Every real brick raises the Beard Brothers school in Florești.", best: "Best" },
 };
 
-const FRED = "'Fredoka', sans-serif";
+// Baloo 2 — chunky rounded display face with full, correctly-weighted Romanian
+// comma-below diacritics (ș/ț), unlike Fredoka whose extended glyphs look thin.
+const FRED = "'Baloo 2', sans-serif";
 const NUN = "'Nunito', sans-serif";
 
 export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro" }) {
@@ -31,7 +33,7 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
   const [screen, setScreen] = useState("start");
   const [lang, setLang] = useState(defaultLang === "en" ? "en" : "ro");
   const [best, setBest] = useState(0);
-  const [res, setRes] = useState({ finalScore: 0, finalBricks: 0, finalCombo: 0, rankTitle: "", rankBlurb: "" });
+  const [res, setRes] = useState({ finalScore: 0, finalBricks: 0, finalCombo: 0, rankIdx: 0 });
 
   useEffect(() => {
     const engine = new GameEngine({
@@ -57,6 +59,8 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
   const e = () => engineRef.current;
   const t = STR[lang] || STR.ro;
   const bestLine = best > 0 ? `${t.best}: ${best}` : "";
+  // rank title/blurb resolved live from the engine's RANKS so they re-translate on toggle
+  const rank = engineRef.current ? engineRef.current.RANKS[res.rankIdx]?.[lang] : null;
 
   return (
     <div
@@ -115,8 +119,7 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
         <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", alignItems: "center", justifyContent: "center", padding: 22, background: "linear-gradient(180deg,rgba(20,40,55,.18),rgba(20,40,55,.5))" }}>
           <div style={{ width: "100%", maxWidth: 380, background: "#FBF4E6", borderRadius: 26, padding: "30px 26px 26px", boxShadow: "0 24px 60px rgba(0,0,0,.32)", animation: "bbPop .35s ease both", textAlign: "center" }}>
             <div style={{ fontFamily: FRED, fontWeight: 600, fontSize: 12, letterSpacing: ".18em", textTransform: "uppercase", color: "#C96A23" }}>Beard Brothers</div>
-            <h1 style={{ fontFamily: FRED, fontWeight: 700, fontSize: "clamp(20px, 7.4vw, 38px)", whiteSpace: "nowrap", lineHeight: 1.04, margin: "6px 0 4px", color: "#2B2A28" }}>{t.title}</h1>
-            <p style={{ margin: "0 0 20px", fontSize: 15, fontWeight: 600, color: "#7A7468" }}>{t.sub}</p>
+            <h1 style={{ fontFamily: FRED, fontWeight: 700, fontSize: "clamp(20px, 7.4vw, 38px)", whiteSpace: "nowrap", lineHeight: 1.04, margin: "6px 0 20px", color: "#2B2A28" }}>{t.title}</h1>
             <div style={{ display: "flex", flexDirection: "column", gap: 9, textAlign: "left", marginBottom: 22 }}>
               {[["#EE8B3D", "1", t.how1], ["#8A8782", "2", t.how2], ["#C0512B", "3", t.how3]].map(([bg, n, txt]) => (
                 <div key={n} style={{ display: "flex", alignItems: "center", gap: 11, fontSize: 14, fontWeight: 600, color: "#3C382F" }}>
@@ -136,8 +139,8 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
         <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", alignItems: "center", justifyContent: "center", padding: 22, background: "linear-gradient(180deg,rgba(20,40,55,.28),rgba(20,40,55,.62))" }}>
           <div style={{ width: "100%", maxWidth: 390, background: "#FBF4E6", borderRadius: 26, padding: 26, boxShadow: "0 24px 60px rgba(0,0,0,.36)", animation: "bbPop .32s ease both", textAlign: "center" }}>
             <div style={{ fontFamily: FRED, fontWeight: 600, fontSize: 12, letterSpacing: ".16em", textTransform: "uppercase", color: "#C96A23" }}>{t.yourRank}</div>
-            <h2 style={{ fontFamily: FRED, fontWeight: 700, fontSize: 30, lineHeight: 1.05, margin: "4px 0 6px", color: "#2B2A28" }}>{res.rankTitle}</h2>
-            <p style={{ margin: "0 auto 18px", maxWidth: 300, fontSize: 14, fontWeight: 600, color: "#7A7468" }}>{res.rankBlurb}</p>
+            <h2 style={{ fontFamily: FRED, fontWeight: 700, fontSize: 30, lineHeight: 1.05, margin: "4px 0 6px", color: "#2B2A28" }}>{rank ? rank[0] : ""}</h2>
+            <p style={{ margin: "0 auto 18px", maxWidth: 300, fontSize: 14, fontWeight: 600, color: "#7A7468" }}>{rank ? rank[1] : ""}</p>
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {[[res.finalScore, t.scoreLabel, "#E0701F"], [res.finalBricks, t.bricks, "#C0512B"], [res.finalCombo, t.bestCombo, "#2B2A28"]].map(([val, label, col], i) => (
                 <div key={i} style={{ flex: 1, background: "#fff", borderRadius: 16, padding: "14px 8px" }}>
