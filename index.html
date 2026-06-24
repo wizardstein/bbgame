@@ -4,8 +4,14 @@
     <meta charset="UTF-8" />
     <link
       rel="icon"
+      type="image/svg+xml"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231c2b33'/%3E%3Crect x='5' y='11' width='22' height='10' rx='2' fill='%23b5532f'/%3E%3Crect x='5' y='11' width='22' height='3' fill='%23e2734f'/%3E%3C/svg%3E"
     />
+    <!-- PNG fallback for browsers/scrapers that ignore SVG favicons (iOS Safari,
+         WhatsApp link previews). apple-touch-icon is what iOS uses for tabs &
+         "Add to Home Screen". -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
