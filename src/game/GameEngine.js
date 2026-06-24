@@ -14,6 +14,7 @@ export class GameEngine {
     };
     this.onScreen = opts.onScreen || (() => {});
     this.onLang = opts.onLang || (() => {});
+    this.onBoard = opts.onBoard || (() => {});
     // HUD DOM nodes are assigned by React via callback refs (same object reference).
     this.hud = { score: null, lives: [null, null, null], combo: null, toast: null };
 
@@ -48,20 +49,35 @@ export class GameEngine {
       bricks: "bricks", bestCombo: "combo", again: "Play again", buy: "Donate a brick", share: "Share",
       overNote: "Every real brick raises the Beard Brothers school in Florești.", best: "Best", toastCopied: "Link copied — share it!" },
   };
+  // NOTE: `dro`/`den` are DRAFT descriptions, rephrased from the (confirmed)
+  // title + stat — no new facts invented. Verify & enrich with the BB team.
   CAMPS = [
-    { c: "#C0512B", icon: "bag", ro: "Beard on! Pentru cei în nevoie", en: "Beard on! For those in need", sro: "40+ saci de haine", sen: "40+ bags of clothes" },
-    { c: "#3E7C8C", icon: "house", ro: "Beard on! For Bărboși", en: "Beard on! For Bărboși", sro: "€3.000 · un sat ajutat", sen: "€3,000 · a village helped" },
-    { c: "#7A9A3B", icon: "heart", ro: "Beard On! For Eduard", en: "Beard On! For Eduard", sro: "€3.354 · o viață salvată", sen: "€3,354 · a life saved" },
-    { c: "#C99A2E", icon: "leaf", ro: "Beard On! For România", en: "Beard On! For Romania", sro: "festivaluri ecologizate", sen: "festivals cleaned up" },
-    { c: "#D8643C", icon: "balloons", ro: "Catch A Smile Day", en: "Catch A Smile Day", sro: "110 orașe · 10.000 baloane", sen: "110 cities · 10,000 balloons" },
-    { c: "#4E8C6A", icon: "bus", ro: "Beards in Schools", en: "Beards in Schools", sro: "€8.035 · un microbuz", sen: "€8,035 · a minibus" },
-    { c: "#9C5BA0", icon: "medal", ro: "Rolling Beards", en: "Rolling Beards", sro: "€7.029 · 5 medalii", sen: "€7,029 · 5 medals" },
-    { c: "#2F6E8F", icon: "car", ro: "The Beard Mobile", en: "The Beard Mobile", sro: "€15.157 · taxi gratuit", sen: "€15,157 · free taxi" },
-    { c: "#B5572E", icon: "people", ro: "Multe fapte bune", en: "Many good deeds", sro: "5 cauze · 360 voluntari", sen: "5 causes · 360 volunteers" },
-    { c: "#B23B3B", icon: "flame", ro: "Enough is Enough!", en: "Enough is Enough!", sro: "€30.973 · secția de arși", sen: "€30,973 · burn unit" },
-    { c: "#3F7FB0", icon: "paint", ro: "Paint the Future", en: "Paint the Future", sro: "€55.000 · spital de copii", sen: "€55,000 · kids hospital" },
-    { c: "#C0392B", icon: "ambulance", ro: "Wheels for Life", en: "Wheels for Life", sro: "€167.500 · 2 ambulanțe", sen: "€167,500 · 2 ambulances" },
-    { c: "#C96A23", icon: "wall", ro: "Beard Brothers School", en: "Beard Brothers School", sro: "€302.540 · o școală", sen: "€302,540 · a school" },
+    { c: "#C0512B", icon: "bag", ro: "Beard on! Pentru cei în nevoie", en: "Beard on! For those in need", sro: "40+ saci de haine", sen: "40+ bags of clothes",
+      dro: "Am strâns și donat peste 40 de saci de haine pentru oameni aflați în nevoie.", den: "We collected and donated 40+ bags of clothes for people in need." },
+    { c: "#3E7C8C", icon: "house", ro: "Beard on! For Bărboși", en: "Beard on! For Bărboși", sro: "€3.000 · un sat ajutat", sen: "€3,000 · a village helped",
+      dro: "Cu 3.000 € strânși, comunitatea Beard Brothers a sărit în ajutorul unui sat întreg.", den: "With €3,000 raised, the Beard Brothers community stepped in to help an entire village." },
+    { c: "#7A9A3B", icon: "heart", ro: "Beard On! For Eduard", en: "Beard On! For Eduard", sro: "€3.354 · o viață salvată", sen: "€3,354 · a life saved",
+      dro: "3.354 € strânși pentru Eduard — o campanie care a ajutat la salvarea unei vieți.", den: "€3,354 raised for Eduard — a campaign that helped save a life." },
+    { c: "#C99A2E", icon: "leaf", ro: "Beard On! For România", en: "Beard On! For Romania", sro: "festivaluri ecologizate", sen: "festivals cleaned up",
+      dro: "Voluntari bărboși au ecologizat festivaluri, lăsând natura mai curată decât au găsit-o.", den: "Bearded volunteers cleaned up festivals, leaving nature cleaner than they found it." },
+    { c: "#D8643C", icon: "balloons", ro: "Catch A Smile Day", en: "Catch A Smile Day", sro: "110 orașe · 10.000 baloane", sen: "110 cities · 10,000 balloons",
+      dro: "Într-o singură zi: 10.000 de baloane în 110 orașe — zâmbete pe bandă rulantă.", den: "In a single day: 10,000 balloons across 110 cities — smiles all around." },
+    { c: "#4E8C6A", icon: "bus", ro: "Beards in Schools", en: "Beards in Schools", sro: "€8.035 · un microbuz", sen: "€8,035 · a minibus",
+      dro: "8.035 € transformați într-un microbuz care duce copiii la școală.", den: "€8,035 turned into a minibus that gets kids to school." },
+    { c: "#9C5BA0", icon: "medal", ro: "Rolling Beards", en: "Rolling Beards", sro: "€7.029 · 5 medalii", sen: "€7,029 · 5 medals",
+      dro: "Rolling Beards: 7.029 € strânși și 5 medalii câștigate pentru o cauză bună.", den: "Rolling Beards: €7,029 raised and 5 medals won for a good cause." },
+    { c: "#2F6E8F", icon: "car", ro: "The Beard Mobile", en: "The Beard Mobile", sro: "€15.157 · taxi gratuit", sen: "€15,157 · free taxi",
+      dro: "15.157 € pentru The Beard Mobile — transport gratuit pentru cei care au nevoie.", den: "€15,157 for The Beard Mobile — free rides for those who need them." },
+    { c: "#B5572E", icon: "people", ro: "Multe fapte bune", en: "Many good deeds", sro: "5 cauze · 360 voluntari", sen: "5 causes · 360 volunteers",
+      dro: "Multe inițiative mai mici, un singur scop: 5 cauze sprijinite de 360 de voluntari.", den: "Many smaller initiatives, one purpose: 5 causes backed by 360 volunteers." },
+    { c: "#B23B3B", icon: "flame", ro: "Enough is Enough!", en: "Enough is Enough!", sro: "€30.973 · secția de arși", sen: "€30,973 · burn unit",
+      dro: "30.973 € strânși pentru secția de arși — pentru că destul înseamnă destul.", den: "€30,973 raised for the burn unit — because enough is enough." },
+    { c: "#3F7FB0", icon: "paint", ro: "Paint the Future", en: "Paint the Future", sro: "€55.000 · spital de copii", sen: "€55,000 · kids hospital",
+      dro: "55.000 € pentru a colora viitorul copiilor dintr-un spital de pediatrie.", den: "€55,000 to brighten the future of children in a pediatric hospital." },
+    { c: "#C0392B", icon: "ambulance", ro: "Wheels for Life", en: "Wheels for Life", sro: "€167.500 · 2 ambulanțe", sen: "€167,500 · 2 ambulances",
+      dro: "167.500 € strânși — suficient pentru două ambulanțe care salvează vieți.", den: "€167,500 raised — enough for two life-saving ambulances." },
+    { c: "#C96A23", icon: "wall", ro: "Beard Brothers School", en: "Beard Brothers School", sro: "€302.540 · o școală", sen: "€302,540 · a school",
+      dro: "302.540 € adunați cărămidă cu cărămidă pentru Școala Beard Brothers din Florești.", den: "€302,540 raised brick by brick for the Beard Brothers School in Florești." },
   ];
   OBST = { ro: ["prejudecată", "indiferență", "birocrație", "stereotip"], en: ["prejudice", "indifference", "red tape", "stereotype"] };
   // Thresholds in bricks caught. Tuned so "legend" (~250) is a genuine achievement —
@@ -110,7 +126,7 @@ export class GameEngine {
     this.player = { x: 0 }; this.targetX = 0; this.vx = 0; this.keyDir = 0;
     this.items = []; this.boards = []; this.particles = [];
     this.dashPhase = 0; this.shake = 0; this.bob = 0;
-    this.playing = false; this.campIdx = 0; this.boardSide = 1;
+    this.playing = false; this.paused = false; this.campIdx = 0; this.boardSide = 1;
     this.holdZ = 2.5; this.boardCooldown = 0.3;
     this._resetRun();
     // pre-seed a couple of drifting boards for the attract screen
@@ -172,9 +188,53 @@ export class GameEngine {
   }
 
   // ---- input ----
-  onDown = (e) => { if (!this.playing) return; this.dragging = true; this.targetX = this._scrToWorldX(e.clientX); };
-  onMove = (e) => { if (this.dragging && this.playing) this.targetX = this._scrToWorldX(e.clientX); };
-  onUp = () => { this.dragging = false; };
+  onDown = (e) => {
+    if (this.paused || !this.playing) return;
+    this.dragging = true; this._moved = false;
+    this._downX = e.clientX; this._downY = e.clientY;
+    this._dragStartClientX = e.clientX; this._dragStartTargetX = this.targetX;
+  };
+  onMove = (e) => {
+    if (!this.dragging || !this.playing) return;
+    if (Math.abs(e.clientX - this._downX) > 8 || Math.abs(e.clientY - this._downY) > 8) this._moved = true;
+    // RELATIVE drag — the barrow follows how far the finger moves; it does NOT
+    // jump to the finger. A plain tap (no movement) leaves it where it is.
+    const dx = (e.clientX - this._dragStartClientX) / this.K;
+    this.targetX = Math.max(-this.maxX, Math.min(this.maxX, this._dragStartTargetX + dx));
+  };
+  onUp = () => {
+    const wasDrag = this._moved;
+    this.dragging = false;
+    if (!this.playing || this.paused) return;
+    // a tap (no drag) on the billboard currently held in view opens it
+    if (!wasDrag) {
+      const b = this._heldBoardAt(this._downX, this._downY);
+      if (b) this.openBoard(b);
+    }
+  };
+
+  // ---- billboard tap-to-read (pause) ----
+  _heldBoardAt(clientX, clientY) {
+    if (!this.canvas) return null;
+    const r = this.canvas.getBoundingClientRect();
+    const x = clientX - r.left, y = clientY - r.top;
+    // tappable whenever the panel is big enough to read (approaching, held or
+    // leaving) — not just during the brief 2s hold.
+    for (const b of this.boards) {
+      if (!b._rect || b._rect.h < 44) continue;
+      const q = b._rect;
+      if (x >= q.x && x <= q.x + q.w && y >= q.y && y <= q.y + q.h) return b;
+    }
+    return null;
+  }
+  openBoard(b) {
+    this.paused = true; this.dragging = false;
+    this.onBoard(b.cm);
+  }
+  resumeBoard = () => {
+    this.paused = false;
+    this.onBoard(null);
+  };
 
   toggleLang = () => { this._lang = this._lang === "ro" ? "en" : "ro"; this.onLang(this._lang); };
   buyBrick = () => { window.open("https://scoala.beard-brothers.ro/ro", "_blank", "noopener,noreferrer"); };
@@ -257,6 +317,7 @@ export class GameEngine {
   };
 
   _update(dt) {
+    if (this.paused) return; // frozen while a billboard is open for reading
     // movement
     if (this.playing) {
       if (this.keyDir) this.targetX = Math.max(-this.maxX, Math.min(this.maxX, this.targetX + this.keyDir * dt * 4.2));
@@ -418,6 +479,7 @@ export class GameEngine {
     const poleH = 1.5 * sc, bw = 2.55 * sc, bh = 1.7 * sc, pw = Math.max(2, 0.13 * sc);
     const topY = base.sy - poleH - bh;
     const left = base.sx - bw / 2;
+    b._rect = { x: left, y: topY, w: bw, h: bh }; // hit-box for tap-to-read
     // pole
     ctx.fillStyle = "#7A5A3A";
     ctx.fillRect(base.sx - pw / 2, topY + bh, pw, base.sy - (topY + bh));

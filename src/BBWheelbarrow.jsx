@@ -12,12 +12,12 @@ const STR = {
   ro: { langBtn: "EN", title: "Construiește Școala", sub: "un joc Beard Brothers",
     how1: "Trage stânga–dreapta ca să prinzi cărămizile", how2: "Ferește roaba de prejudecată, indiferență, birocrație și stereotip", how3: "3 greșeli și zidul se prăbușește",
     play: "Joacă", hint: "trage cu degetul ca să muți roaba", scoreLabel: "puncte", yourRank: "Rangul tău",
-    bricks: "cărămizi", bestCombo: "combo", again: "Încă o tură", buy: "Donează o cărămidă", share: "Distribuie",
+    bricks: "cărămizi", bestCombo: "combo", again: "Încă o tură", buy: "Donează o cărămidă", share: "Distribuie", resume: "Continuă jocul",
     overNote: "Fiecare cărămidă reală ridică școala Beard Brothers, în Florești.", best: "Record" },
   en: { langBtn: "RO", title: "Build the School", sub: "a Beard Brothers game",
     how1: "Drag left–right to catch the bricks", how2: "Keep prejudice, indifference, red tape & stereotypes out", how3: "3 misses and the wall collapses",
     play: "Play", hint: "drag to move the wheelbarrow", scoreLabel: "points", yourRank: "Your rank",
-    bricks: "bricks", bestCombo: "combo", again: "Play again", buy: "Donate a brick", share: "Share",
+    bricks: "bricks", bestCombo: "combo", again: "Play again", buy: "Donate a brick", share: "Share", resume: "Resume game",
     overNote: "Every real brick raises the Beard Brothers school in Florești.", best: "Best" },
 };
 
@@ -32,11 +32,13 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
   const engineRef = useRef(null);
   const hud = useRef({ score: null, lives: [null, null, null], combo: null, mult: null, toast: null });
   const primaryBtnRef = useRef(null);
+  const boardBtnRef = useRef(null);
 
   const [screen, setScreen] = useState("start");
   const [lang, setLang] = useState(defaultLang === "en" ? "en" : "ro");
   const [best, setBest] = useState(0);
   const [res, setRes] = useState({ finalScore: 0, finalBricks: 0, finalCombo: 0, rankIdx: 0 });
+  const [board, setBoard] = useState(null);
 
   useEffect(() => {
     const engine = new GameEngine({
@@ -50,6 +52,7 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
         else if (scr === "over" && r) track("game_over", { score: r.finalScore, bricks: r.finalBricks, combo: r.finalCombo });
       },
       onLang: (l) => setLang(l),
+      onBoard: (cm) => { setBoard(cm); if (cm) track("billboard_open", { campaign: cm.en }); },
     });
     engine.hud = hud.current;
     engineRef.current = engine;
@@ -69,6 +72,9 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
   useEffect(() => {
     if (screen === "start" || screen === "over") primaryBtnRef.current?.focus();
   }, [screen]);
+
+  // focus the resume button when a billboard opens for reading
+  useEffect(() => { if (board) boardBtnRef.current?.focus(); }, [board]);
 
   const e = () => engineRef.current;
   const t = STR[lang] || STR.ro;
@@ -173,6 +179,22 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => { track("share_click"); e() && e().shareScore(); }} style={{ flex: 1, border: "2px solid #E0701F", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 16, color: "#E0701F", background: "#fff", borderRadius: 14, padding: 12 }}>{t.share}</button>
               <button onClick={() => e() && e().startGame()} style={{ flex: 1, border: "none", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 16, color: "#2B2A28", background: "#EFE6D2", borderRadius: 14, padding: 12 }}>{t.again}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BILLBOARD DETAIL — tap a billboard to read it; the game is paused */}
+      {board && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 45, display: "flex", alignItems: "center", justifyContent: "center", padding: 22, background: "linear-gradient(180deg,rgba(20,40,55,.42),rgba(20,40,55,.72))" }}>
+          <div style={{ width: "100%", maxWidth: 380, background: "#FBF4E6", borderRadius: 26, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.42)", animation: "bbPop .3s ease both" }}>
+            <div style={{ background: board.c, color: "#fff", fontFamily: FRED, fontWeight: 600, fontSize: 13, letterSpacing: ".16em", textTransform: "uppercase", padding: "12px 22px", textAlign: "center" }}>Beard Brothers</div>
+            <div style={{ padding: "22px 24px 24px", textAlign: "center" }}>
+              <h2 style={{ fontFamily: FRED, fontWeight: 700, fontSize: 25, lineHeight: 1.12, margin: "0 0 12px", color: "#2B2A28" }}>{board[lang]}</h2>
+              <span style={{ display: "inline-block", marginBottom: 14, background: board.c, color: "#fff", fontFamily: NUN, fontWeight: 800, fontSize: 15, padding: "6px 16px", borderRadius: 999 }}>{board["s" + lang]}</span>
+              <p style={{ margin: "0 0 20px", fontSize: 15, fontWeight: 600, color: "#5C5648", lineHeight: 1.5 }}>{board["d" + lang]}</p>
+              <button ref={boardBtnRef} onClick={() => e() && e().resumeBoard()} style={{ width: "100%", border: "none", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 18, color: "#fff", background: "linear-gradient(#F08C3E,#E0701F)", borderRadius: 16, padding: 14, boxShadow: "0 5px 0 #B6541A", marginBottom: 10 }}>{t.resume}</button>
+              <button onClick={() => { track("buy_brick_click"); e() && e().buyBrick(); }} style={{ width: "100%", border: "2px solid #E0701F", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 15, color: "#E0701F", background: "#fff", borderRadius: 14, padding: 11 }}>🧱 {t.buy}</button>
             </div>
           </div>
         </div>
