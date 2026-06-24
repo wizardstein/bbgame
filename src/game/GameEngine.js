@@ -129,7 +129,16 @@ export class GameEngine {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.cx = this.W / 2;
     this.horizon = this.H * 0.32;
-    this.K = this.W * 0.15;
+    // Aspect-aware zoom: on a tall phone, K = W*0.15 makes the whole world tiny & far.
+    // Zoom portrait screens in and shorten the road so it reads close, like the wide
+    // desktop view. To keep things on-screen at the bigger scale we tighten the player
+    // travel (maxX) and the brick spawn band so nothing flies past the screen edges.
+    const aspect = this.W / this.H;
+    this.zoom = aspect < 0.72 ? Math.min(1.6, 1 + (0.72 - aspect) * 2.4) : 1;
+    this.K = this.W * 0.15 * this.zoom;
+    this.zFar = aspect < 0.72 ? 11 : 16;
+    this.maxX = Math.min(2.15, (this.W * 0.46) / this.K);
+    this._spawnHalf = Math.min(this.roadHalf - 0.55, (this.W * 0.5) / this.K - 0.15);
   }
 
   project(x, z, y) {
@@ -194,7 +203,8 @@ export class GameEngine {
   _spawnItem() {
     const obFreq = Math.min(0.16 + this.score / 4000, 0.32);
     const isOb = Math.random() < obFreq;
-    const x = (Math.random() * 2 - 1) * (this.roadHalf - 0.55);
+    const half = this._spawnHalf || this.roadHalf - 0.55;
+    const x = (Math.random() * 2 - 1) * half;
     if (isOb) {
       const arr = this.OBST[this._lang];
       this.items.push({ x, z: this.zFar, ob: true, label: arr[(Math.random() * arr.length) | 0], done: false, hop: 0 });
@@ -556,7 +566,7 @@ export class GameEngine {
     const ctx = this.ctx;
     const cxp = this.cx + this.player.x * this.K;
     const baseY = this.H * 0.9 + Math.sin(this.bob * 3) * 2;
-    const ww = this.W * 0.36, wh = ww * 0.42;
+    const ww = this.W * 0.36 * (this.zoom || 1), wh = ww * 0.42;
     const tilt = Math.max(-0.18, Math.min(0.18, -this.vx * 0.05));
     ctx.save();
     ctx.translate(cxp, baseY);
