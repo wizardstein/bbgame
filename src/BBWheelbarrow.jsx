@@ -4,13 +4,16 @@ import { GameEngine } from "./game/GameEngine.js";
 // UI string table (DOM overlays). Kept in sync with GameEngine.STR — single source
 // later via CMS/i18n. The engine owns the canvas-rendered strings + obstacle labels.
 const STR = {
-  ro: { langBtn: "EN", title: "Construiește Școala", sub: "un joc Beard Brothers",
-    how1: "Trage stânga–dreapta ca să prinzi cărămizile", how2: "Ferește roaba de prejudecăți", how3: "3 greșeli și zidul se prăbușește",
+  // NB: the big Fredoka title uses cedilla ş/Ş (U+015F/U+015E), not comma ș/Ș, because
+  // Fredoka detaches comma-below marks when the title wraps to two line-boxes. Everything
+  // else is Nunito (no such bug) and keeps the correct Romanian comma ș/ț.
+  ro: { langBtn: "EN", title: "Construieşte Şcoala", sub: "un joc Beard Brothers",
+    how1: "Trage stânga–dreapta ca să prinzi cărămizile", how2: "Ferește roaba de prejudecată, indiferență, birocrație și stereotip", how3: "3 greșeli și zidul se prăbușește",
     play: "Joacă", hint: "trage cu degetul ca să muți roaba", scoreLabel: "puncte", yourRank: "Rangul tău",
     bricks: "cărămizi", bestCombo: "combo", again: "Încă o tură", buy: "Cumpără o cărămidă", share: "Distribuie",
     overNote: "Fiecare cărămidă reală ridică școala Beard Brothers, în Florești.", best: "Record" },
   en: { langBtn: "RO", title: "Build the School", sub: "a Beard Brothers game",
-    how1: "Drag left–right to catch the bricks", how2: "Keep prejudice out of the barrow", how3: "3 misses and the wall collapses",
+    how1: "Drag left–right to catch the bricks", how2: "Keep prejudice, indifference, red tape & stereotypes out", how3: "3 misses and the wall collapses",
     play: "Play", hint: "drag to move the wheelbarrow", scoreLabel: "points", yourRank: "Your rank",
     bricks: "bricks", bestCombo: "combo", again: "Play again", buy: "Buy a brick", share: "Share",
     overNote: "Every real brick raises the Beard Brothers school in Florești.", best: "Best" },

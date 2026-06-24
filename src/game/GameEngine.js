@@ -32,13 +32,14 @@ export class GameEngine {
 
   // ---- static content ----
   STR = {
-    ro: { langBtn: "EN", title: "Construiește Școala", sub: "un joc Beard Brothers",
-      how1: "Trage stânga–dreapta ca să prinzi cărămizile", how2: "Ferește roaba de prejudecăți", how3: "3 greșeli și zidul se prăbușește",
+    // cedilla ş/Ş in the title — see BBWheelbarrow.jsx note (Fredoka comma-below wrap bug)
+    ro: { langBtn: "EN", title: "Construieşte Şcoala", sub: "un joc Beard Brothers",
+      how1: "Trage stânga–dreapta ca să prinzi cărămizile", how2: "Ferește roaba de prejudecată, indiferență, birocrație și stereotip", how3: "3 greșeli și zidul se prăbușește",
       play: "Joacă", hint: "trage cu degetul ca să muți roaba", scoreLabel: "puncte", yourRank: "Rangul tău",
       bricks: "cărămizi", bestCombo: "combo", again: "Încă o tură", buy: "Cumpără o cărămidă", share: "Distribuie",
       overNote: "Fiecare cărămidă reală ridică școala Beard Brothers, în Florești.", best: "Record", toastCopied: "Link copiat — distribuie!" },
     en: { langBtn: "RO", title: "Build the School", sub: "a Beard Brothers game",
-      how1: "Drag left–right to catch the bricks", how2: "Keep prejudice out of the barrow", how3: "3 misses and the wall collapses",
+      how1: "Drag left–right to catch the bricks", how2: "Keep prejudice, indifference, red tape & stereotypes out", how3: "3 misses and the wall collapses",
       play: "Play", hint: "drag to move the wheelbarrow", scoreLabel: "points", yourRank: "Your rank",
       bricks: "bricks", bestCombo: "combo", again: "Play again", buy: "Buy a brick", share: "Share",
       overNote: "Every real brick raises the Beard Brothers school in Florești.", best: "Best", toastCopied: "Link copied — share it!" },
@@ -136,7 +137,11 @@ export class GameEngine {
     const aspect = this.W / this.H;
     this.zoom = aspect < 0.72 ? Math.min(1.6, 1 + (0.72 - aspect) * 2.4) : 1;
     this.K = this.W * 0.15 * this.zoom;
-    this.zFar = aspect < 0.72 ? 11 : 16;
+    // Closeness comes from the zoom, not from a short road — keep items spawning far
+    // (zFar) and draw the road all the way to the horizon (roadFar) so it converges to
+    // a point instead of ending in an abrupt edge.
+    this.zFar = 16;
+    this.roadFar = 60;
     this.maxX = Math.min(2.15, (this.W * 0.46) / this.K);
     this._spawnHalf = Math.min(this.roadHalf - 0.55, (this.W * 0.5) / this.K - 0.15);
   }
@@ -268,10 +273,13 @@ export class GameEngine {
           } else {
             if (reach) {
               this.bricksCaught++; this.combo++; this.bestCombo = Math.max(this.bestCombo, this.combo);
+              const prevMult = this.comboMult;
               this.comboMult = Math.min(1 + Math.floor(this.combo / 4), 6);
               this.score += 12 * this.comboMult;
               this._burst(this.player.x, "#E0701F");
-              if (this.comboMult > 1) { this.comboTimer = 1.1; this._showCombo(); }
+              // pop the combo popup once per new multiplier tier, then let it fade
+              // (don't keep re-triggering every catch, which made "x2" linger).
+              if (this.comboMult > 1 && this.comboMult !== prevMult) { this.comboTimer = 1.1; this._showCombo(); }
             } else { this._hit(); }
           }
         }
@@ -351,22 +359,23 @@ export class GameEngine {
 
   _drawRoad() {
     const ctx = this.ctx;
+    const far = this.roadFar || this.zFar;
     const nl = this.project(-this.roadHalf - 0.35, this.zNear, 0);
     const nr = this.project(this.roadHalf + 0.35, this.zNear, 0);
-    const fl = this.project(-this.roadHalf - 0.35, this.zFar, 0);
-    const fr = this.project(this.roadHalf + 0.35, this.zFar, 0);
+    const fl = this.project(-this.roadHalf - 0.35, far, 0);
+    const fr = this.project(this.roadHalf + 0.35, far, 0);
     // verge / edge
     ctx.fillStyle = this.COL.roadEdge;
     ctx.beginPath(); ctx.moveTo(nl.sx, nl.sy); ctx.lineTo(nr.sx, nr.sy); ctx.lineTo(fr.sx, fr.sy); ctx.lineTo(fl.sx, fl.sy); ctx.closePath(); ctx.fill();
     // road
     const rl = this.project(-this.roadHalf, this.zNear, 0), rr = this.project(this.roadHalf, this.zNear, 0);
-    const rfl = this.project(-this.roadHalf, this.zFar, 0), rfr = this.project(this.roadHalf, this.zFar, 0);
+    const rfl = this.project(-this.roadHalf, far, 0), rfr = this.project(this.roadHalf, far, 0);
     ctx.fillStyle = this.COL.road;
     ctx.beginPath(); ctx.moveTo(rl.sx, rl.sy); ctx.lineTo(rr.sx, rr.sy); ctx.lineTo(rfr.sx, rfr.sy); ctx.lineTo(rfl.sx, rfl.sy); ctx.closePath(); ctx.fill();
     // dashes
     ctx.fillStyle = this.COL.dash;
-    for (let zz = this.zNear + this.dashPhase; zz < this.zFar; zz += 2.4) {
-      const a = this.project(0, zz, 0), b = this.project(0, Math.min(zz + 1.1, this.zFar), 0);
+    for (let zz = this.zNear + this.dashPhase; zz < far; zz += 2.4) {
+      const a = this.project(0, zz, 0), b = this.project(0, Math.min(zz + 1.1, far), 0);
       const wa = 0.12 * this.K * a.p, wb = 0.12 * this.K * b.p;
       ctx.beginPath(); ctx.moveTo(a.sx - wa, a.sy); ctx.lineTo(a.sx + wa, a.sy); ctx.lineTo(b.sx + wb, b.sy); ctx.lineTo(b.sx - wb, b.sy); ctx.closePath(); ctx.fill();
     }
@@ -529,6 +538,11 @@ export class GameEngine {
     const pr = this.project(it.x, it.z, hop);
     if (pr.p <= 0.04) return;
     const sc = this.K * pr.p;
+    // fade in over the first couple of world units so items emerge from the distance
+    // instead of popping onto the road.
+    const fade = Math.max(0, Math.min(1, (this.zFar - it.z) / 2));
+    ctx.save();
+    ctx.globalAlpha = fade;
     if (it.ob) {
       // grey boulder of prejudice
       const r = 0.42 * sc;
@@ -560,6 +574,7 @@ export class GameEngine {
       ctx.fillStyle = this.COL.brickTop;
       ctx.beginPath(); ctx.moveTo(x - w / 2, y - h); ctx.lineTo(x - w / 2 + d, y - h - d); ctx.lineTo(x + w / 2 + d, y - h - d); ctx.lineTo(x + w / 2, y - h); ctx.closePath(); ctx.fill();
     }
+    ctx.restore();
   }
 
   _drawWheelbarrow() {
