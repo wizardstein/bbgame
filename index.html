@@ -10,29 +10,55 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <title>Beard Brothers — Cărămidă cu cărămidă</title>
+    <title>Beard Brothers — Construiește Școala</title>
     <meta
       name="description"
-      content="Prinde cele 100 de cărămizi și ajută la construirea Școlii BB. Un joc Beard Brothers."
+      content="Prinde cărămizile, ferește roaba de prejudecăți și ridică Școala Beard Brothers din Florești."
     />
-    <meta name="theme-color" content="#1c2b33" />
-    <meta property="og:title" content="Beard Brothers — Cărămidă cu cărămidă" />
+    <meta name="theme-color" content="#A8DCF2" />
+    <meta property="og:title" content="Beard Brothers — Construiește Școala" />
     <meta
       property="og:description"
       content="Prinde cărămizile, construiește Școala BB. Poți să mă întreci?"
     />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
     <style>
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
       html,
       body,
       #root {
         height: 100%;
         margin: 0;
-        background: #1c2b33;
+        background: #a8dcf2;
       }
       body {
+        font-family: "Nunito", system-ui, sans-serif;
+        overflow: hidden;
         overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      @keyframes bbPop {
+        0% { transform: scale(0.82); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      @keyframes bbFloat {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-7px); }
+      }
+      @keyframes bbRise {
+        0% { transform: translateY(16px); opacity: 0; }
+        100% { transform: translateY(0); opacity: 1; }
       }
     </style>
   </head>

@@ -1,16 +1,7 @@
 import BBWheelbarrow from "./BBWheelbarrow.jsx";
 
+// Full-viewport stage (the engine's wrap is position:fixed inset:0).
+// difficulty: "easy" | "normal" | "hard" · defaultLang: "ro" | "en"
 export default function App() {
-  return (
-    <div
-      style={{
-        minHeight: "100dvh",
-        display: "flex",
-        justifyContent: "center",
-        background: "#1c2b33",
-      }}
-    >
-      <BBWheelbarrow />
-    </div>
-  );
+  return <BBWheelbarrow difficulty="normal" defaultLang="ro" />;
 }

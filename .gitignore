@@ -8,3 +8,4 @@ dist
 harness.html
 .playwright-mcp
 bb-*.png
+bugs/

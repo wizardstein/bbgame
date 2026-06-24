@@ -1,50 +1,54 @@
-# Beard Brothers — Cărămidă cu cărămidă 🧱
+# Beard Brothers — Brick Catcher 🧱
 
-Joc hyper-casual de tip *brick-catcher* la persoana întâi pentru **Beard Brothers**.
-Playerul ține o roabă și prinde cele 100 de cărămizi care cad din cer, ca să ajute la
-construirea **Școlii BB** — cărămidă cu cărămidă. Scop: awareness, engagement, virality.
+A catchy, shareable arcade game for the **Beard Brothers** NGO (Cluj-Napoca) promoting
+its flagship campaign — the **Beard Brothers School in Florești**, built brick by brick
+(https://scoala.beard-brothers.ro/ro).
+
+**Core loop:** drag a wheelbarrow left/right along a perspective road to **catch falling
+bricks** while **dodging grey boulders** labelled with the stereotypes the NGO fights
+(*prejudecată, indiferență, birocrație, stereotip*). Catch a brick → points + combo. Miss
+a brick or scoop a stereotype → a strike. **3 strikes and the wall collapses.** Roadside
+**billboards** glide in and pause to showcase the NGO's 13 real campaigns. Game-over shows
+a playful **rank** + a **"Buy a brick"** CTA and **Share**. Bilingual **RO / EN**.
+
+This is a faithful implementation of the Claude Design handoff (2.5D pseudo-3D Canvas).
 
 ## Stack
 
-- React 18 + Vite
-- Three.js (încărcat de la CDN la runtime, r128)
-- Single-component game: `src/BBWheelbarrow.jsx`
+- **Shell:** React 18 + Vite — menus, HUD, i18n, screen transitions.
+- **Game core:** framework-agnostic vanilla `Canvas2D` engine in `src/game/GameEngine.js`
+  (projection, spawning, physics, scoring, drawing). Dependency-free, 60fps on low-end phones.
+- React mounts the engine onto a `<canvas>` and subscribes to `onScreen` / `onLang`
+  callbacks. Hot per-frame values (score, lives, combo) are written **imperatively** to DOM
+  nodes — kept out of React state to avoid re-render thrash.
+- Fonts: **Fredoka** + **Nunito** (Google Fonts).
 
-## Dezvoltare locală
+## Development
 
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm run build    # output în dist/
+npm run build    # output in dist/
 npm run preview
 ```
 
-## Deploy pe Vercel
+## Deploy on Vercel
 
-Vercel detectează automat Vite (Build: `npm run build`, Output: `dist`).
-Importă repo-ul în Vercel și gata — fără configurare suplimentară.
+Vercel auto-detects Vite (Build: `npm run build`, Output: `dist`). Import the repo — no config.
 
-## Ce e implementat
+## Tuning & content
 
-- **Mobile-first**, playfield fix (max 480px) — identic pe desktop și pe telefon.
-- Roabă realistă văzută de sus (ca și cum o ții tu), încadrată corect pe orice ecran.
-- Limite clare: roaba stă în carosabil, borduri 3D, feedback pe marginea ecranului.
-- Dificultate graduală: spawn de la `0.95s` → `0.50s` → `0.34s` (sprint final).
-- Cărămizile sunt **colectate** (alunecă în cuvă), nu sparte.
-- Ecran final: zidul tău cu **exact** câte cărămizi ai strâns (running-bond).
-- Reclame Beard Brothers pe marginea drumului cu **props 3D** (baloane, copaci,
-  ambulanță, picătură de sânge etc.) și badge de status (`ÎN DESFĂȘURARE` /
-  `REALIZAT` / `ÎN PLAN`).
-- Viralitate: record local, share + WhatsApp, link de provocare `?challenge=<scor>`,
-  CTA donație către școala BB.
+- Gameplay constants (speed, spawn rates, difficulty, ranks) live in `GameEngine.js`
+  (`_setup`, `_resetRun`, `_spawnItem`, `_update`). Props: `difficulty` (`easy|normal|hard`),
+  `defaultLang` (`ro|en`) — set in `src/App.jsx`.
+- Campaign billboard data: `CAMPS` in `GameEngine.js` (mirrors `campaigns.json` from the
+  design bundle). **Verify all figures with the BB team before launch.**
+- UI strings: `STR` in both `GameEngine.js` (canvas) and `BBWheelbarrow.jsx` (DOM overlays).
 
-### De curățat / de confirmat
+## Roadmap (from the design handoff)
 
-Lista de campanii și statusul lor se editează în `src/BBWheelbarrow.jsx` →
-constanta `BILLBOARDS`. Marcați corect ce e activ, realizat sau în plan.
-
-## Roadmap (later)
-
-- Leaderboard global (Supabase / Cloudflare KV)
-- OG image dinamic per scor (preview cu scorul în WhatsApp/Facebook)
-- Certificat „o cărămidă donată în numele tău”
+1. Leaderboard (Supabase) with **server-side score validation** + name entry on game-over.
+2. Analytics (PostHog/GA4): `game_start`, `game_over`, `buy_brick_click` (with UTM), `share_click`.
+3. Dynamic OG share images (`/share/:score`) so shared links show the player's rank + bricks.
+4. Billboard CMS so the BB team edits campaigns without a deploy.
+5. Assets from BB: official logo + brand hex confirmation + optional real campaign photos.
