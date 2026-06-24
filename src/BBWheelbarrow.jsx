@@ -139,8 +139,7 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
         <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", alignItems: "center", justifyContent: "center", padding: 22, background: "linear-gradient(180deg,rgba(20,40,55,.28),rgba(20,40,55,.62))" }}>
           <div style={{ width: "100%", maxWidth: 390, background: "#FBF4E6", borderRadius: 26, padding: 26, boxShadow: "0 24px 60px rgba(0,0,0,.36)", animation: "bbPop .32s ease both", textAlign: "center" }}>
             <div style={{ fontFamily: FRED, fontWeight: 600, fontSize: 12, letterSpacing: ".16em", textTransform: "uppercase", color: "#C96A23" }}>{t.yourRank}</div>
-            <h2 style={{ fontFamily: FRED, fontWeight: 700, fontSize: 30, lineHeight: 1.05, margin: "4px 0 6px", color: "#2B2A28" }}>{rank ? rank[0] : ""}</h2>
-            <p style={{ margin: "0 auto 18px", maxWidth: 300, fontSize: 14, fontWeight: 600, color: "#7A7468" }}>{rank ? rank[1] : ""}</p>
+            <h2 style={{ fontFamily: FRED, fontWeight: 700, fontSize: 30, lineHeight: 1.05, margin: "4px 0 18px", color: "#2B2A28" }}>{rank ? rank[0] : ""}</h2>
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {[[res.finalScore, t.scoreLabel, "#E0701F"], [res.finalBricks, t.bricks, "#C0512B"], [res.finalCombo, t.bestCombo, "#2B2A28"]].map(([val, label, col], i) => (
                 <div key={i} style={{ flex: 1, background: "#fff", borderRadius: 16, padding: "14px 8px" }}>

@@ -310,7 +310,7 @@ export class GameEngine {
   }
   _showCombo() {
     const el = this.hud.combo; if (!el) return;
-    el.textContent = "×" + this.comboMult + (this._lang === "ro" ? " multiplicator" : " multiplier");
+    el.textContent = "×" + this.comboMult;
   }
   _updateHud() {
     if (this.hud.score) this.hud.score.textContent = this.score;
