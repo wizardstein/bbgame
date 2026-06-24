@@ -184,15 +184,19 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
         </div>
       )}
 
-      {/* BILLBOARD DETAIL — tap a billboard to read it; the game is paused */}
+      {/* BILLBOARD DETAIL — tap a billboard to read it; the game is paused.
+          Capped height with an internally scrollable body so long descriptions
+          never spill over or get truncated; header + buttons stay pinned. */}
       {board && (
         <div style={{ position: "absolute", inset: 0, zIndex: 45, display: "flex", alignItems: "center", justifyContent: "center", padding: 22, background: "linear-gradient(180deg,rgba(20,40,55,.42),rgba(20,40,55,.72))" }}>
-          <div style={{ width: "100%", maxWidth: 380, background: "#FBF4E6", borderRadius: 26, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.42)", animation: "bbPop .3s ease both" }}>
-            <div style={{ background: board.c, color: "#fff", fontFamily: FRED, fontWeight: 600, fontSize: 13, letterSpacing: ".16em", textTransform: "uppercase", padding: "12px 22px", textAlign: "center" }}>Beard Brothers</div>
-            <div style={{ padding: "22px 24px 24px", textAlign: "center" }}>
-              <h2 style={{ fontFamily: FRED, fontWeight: 700, fontSize: 25, lineHeight: 1.12, margin: "0 0 12px", color: "#2B2A28" }}>{board[lang]}</h2>
-              <span style={{ display: "inline-block", marginBottom: 14, background: board.c, color: "#fff", fontFamily: NUN, fontWeight: 800, fontSize: 15, padding: "6px 16px", borderRadius: 999 }}>{board["s" + lang]}</span>
-              <p style={{ margin: "0 0 20px", fontSize: 15, fontWeight: 600, color: "#5C5648", lineHeight: 1.5 }}>{board["d" + lang]}</p>
+          <div style={{ width: "100%", maxWidth: 380, maxHeight: "86vh", display: "flex", flexDirection: "column", background: "#FBF4E6", borderRadius: 26, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.42)", animation: "bbPop .3s ease both" }}>
+            <div style={{ flex: "none", background: board.c, color: "#fff", fontFamily: FRED, fontWeight: 600, fontSize: 13, letterSpacing: ".16em", textTransform: "uppercase", padding: "12px 22px", textAlign: "center" }}>Beard Brothers</div>
+            <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", touchAction: "pan-y", padding: "22px 24px 6px", textAlign: "center" }}>
+              <h2 style={{ fontFamily: FRED, fontWeight: 700, fontSize: 25, lineHeight: 1.12, margin: "0 0 12px", color: "#2B2A28", overflowWrap: "anywhere" }}>{board[lang]}</h2>
+              <div><span style={{ display: "inline-block", maxWidth: "100%", marginBottom: 14, background: board.c, color: "#fff", fontFamily: NUN, fontWeight: 800, fontSize: 15, padding: "6px 16px", borderRadius: 999, overflowWrap: "anywhere" }}>{board["s" + lang]}</span></div>
+              <p style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 600, color: "#5C5648", lineHeight: 1.55, overflowWrap: "anywhere", whiteSpace: "pre-line", textAlign: "left" }}>{board["d" + lang]}</p>
+            </div>
+            <div style={{ flex: "none", padding: "12px 24px 20px", borderTop: "1px solid rgba(0,0,0,.07)" }}>
               <button ref={boardBtnRef} onClick={() => e() && e().resumeBoard()} style={{ width: "100%", border: "none", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 18, color: "#fff", background: "linear-gradient(#F08C3E,#E0701F)", borderRadius: 16, padding: 14, boxShadow: "0 5px 0 #B6541A", marginBottom: 10 }}>{t.resume}</button>
               <button onClick={() => { track("buy_brick_click"); e() && e().buyBrick(); }} style={{ width: "100%", border: "2px solid #E0701F", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 15, color: "#E0701F", background: "#fff", borderRadius: 14, padding: 11 }}>🧱 {t.buy}</button>
             </div>
