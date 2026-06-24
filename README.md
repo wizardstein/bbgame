@@ -21,7 +21,7 @@ This is a faithful implementation of the Claude Design handoff (2.5D pseudo-3D C
 - React mounts the engine onto a `<canvas>` and subscribes to `onScreen` / `onLang`
   callbacks. Hot per-frame values (score, lives, combo) are written **imperatively** to DOM
   nodes — kept out of React state to avoid re-render thrash.
-- Fonts: **Fredoka** + **Nunito** (Google Fonts).
+- Fonts: **Baloo 2** + **Nunito** (Google Fonts).
 
 ## Development
 

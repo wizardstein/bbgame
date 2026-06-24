@@ -20,7 +20,7 @@ export class GameEngine {
     this._lang = this.props.defaultLang === "en" ? "en" : "ro";
     let best = 0;
     try {
-      best = parseInt(localStorage.getItem("bbwb_best") || "0", 10) || 0;
+      best = parseInt(localStorage.getItem("bbwb_best_bricks") || "0", 10) || 0;
     } catch (e) {}
     this.best = best;
 
@@ -28,6 +28,11 @@ export class GameEngine {
     this.finalScore = 0;
     this.finalBricks = 0;
     this.finalCombo = 0;
+
+    // Honor the OS "reduce motion" setting — screen shake & particle bursts are
+    // gated on this for vestibular safety. Falls back to false if unsupported.
+    this.reduceMotion = false;
+    try { this.reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
   }
 
   // ---- static content ----
@@ -52,7 +57,7 @@ export class GameEngine {
     { c: "#4E8C6A", icon: "bus", ro: "Beards in Schools", en: "Beards in Schools", sro: "€8.035 · un microbuz", sen: "€8,035 · a minibus" },
     { c: "#9C5BA0", icon: "medal", ro: "Rolling Beards", en: "Rolling Beards", sro: "€7.029 · 5 medalii", sen: "€7,029 · 5 medals" },
     { c: "#2F6E8F", icon: "car", ro: "The Beard Mobile", en: "The Beard Mobile", sro: "€15.157 · taxi gratuit", sen: "€15,157 · free taxi" },
-    { c: "#B5572E", icon: "people", ro: "Campania 9", en: "Campaign 9", sro: "5 cauze · 360 voluntari", sen: "5 causes · 360 volunteers" },
+    { c: "#B5572E", icon: "people", ro: "Multe fapte bune", en: "Many good deeds", sro: "5 cauze · 360 voluntari", sen: "5 causes · 360 volunteers" },
     { c: "#B23B3B", icon: "flame", ro: "Enough is Enough!", en: "Enough is Enough!", sro: "€30.973 · secția de arși", sen: "€30,973 · burn unit" },
     { c: "#3F7FB0", icon: "paint", ro: "Paint the Future", en: "Paint the Future", sro: "€55.000 · spital de copii", sen: "€55,000 · kids hospital" },
     { c: "#C0392B", icon: "ambulance", ro: "Wheels for Life", en: "Wheels for Life", sro: "€167.500 · 2 ambulanțe", sen: "€167,500 · 2 ambulances" },
@@ -62,9 +67,9 @@ export class GameEngine {
   // Thresholds in bricks caught. Tuned so "legend" (~250) is a genuine achievement —
   // a relaxed run lands around 260, so legend should sit right about there.
   RANKS = [
-    { min: 0, ro: ["Trecător curios", "Te-ai oprit din drum — bun început!"], en: ["Curious passer-by", "You stopped to look — nice start!"] },
-    { min: 45, ro: ["Voluntar nou", "Mâinile încep să prindă ritm."], en: ["Rookie volunteer", "Your hands are finding the rhythm."] },
-    { min: 105, ro: ["Frate bărbos", "Zidul crește văzând cu ochii."], en: ["Bearded brother", "The wall is rising fast."] },
+    { min: 0, ro: ["Trecător curios", "Un început bun, continuă!"], en: ["Curious passer-by", "A good start — keep going!"] },
+    { min: 45, ro: ["Voluntar nou", "Roaba începe să se umple."], en: ["Rookie volunteer", "The wheelbarrow is filling up."] },
+    { min: 105, ro: ["De-ai noștri", "Zidul crește văzând cu ochii."], en: ["One of the crew", "The wall is rising fast."] },
     { min: 175, ro: ["Maistru de nădejde", "Școala se ridică datorită ție."], en: ["Trusted foreman", "The school is rising thanks to you."] },
     { min: 250, ro: ["Legendă Beard Brothers", "Bărboșii îți ridică pălăria."], en: ["Beard Brothers legend", "The bearded ones salute you."] },
   ];
@@ -97,6 +102,7 @@ export class GameEngine {
     window.removeEventListener("resize", this._onResize);
     window.removeEventListener("keydown", this._onKey);
     window.removeEventListener("keyup", this._onKeyUp);
+    clearTimeout(this._tt);
   }
 
   _setup() {
@@ -131,6 +137,11 @@ export class GameEngine {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.cx = this.W / 2;
     this.horizon = this.H * 0.32;
+    // Cache the static sky gradient (only changes on resize) instead of rebuilding
+    // it every frame in _draw.
+    this._skyGrad = this.ctx.createLinearGradient(0, 0, 0, this.horizon + 40);
+    this._skyGrad.addColorStop(0, this.COL.skyTop);
+    this._skyGrad.addColorStop(1, this.COL.skyBot);
     // Aspect-aware zoom: on a tall phone, K = W*0.15 makes the whole world tiny & far.
     // Zoom portrait screens in and shorten the road so it reads close, like the wide
     // desktop view. To keep things on-screen at the bigger scale we tighten the player
@@ -164,7 +175,7 @@ export class GameEngine {
   onUp = () => { this.dragging = false; };
 
   toggleLang = () => { this._lang = this._lang === "ro" ? "en" : "ro"; this.onLang(this._lang); };
-  buyBrick = () => { window.open("https://scoala.beard-brothers.ro/ro", "_blank"); };
+  buyBrick = () => { window.open("https://scoala.beard-brothers.ro/ro", "_blank", "noopener,noreferrer"); };
   shareScore = () => {
     const L = this._lang;
     const txt = L === "ro"
@@ -174,8 +185,13 @@ export class GameEngine {
     if (navigator.share) { navigator.share({ title: "Beard Brothers", text: txt, url }).catch(() => {}); }
     else {
       const t = txt + " " + url;
-      if (navigator.clipboard) navigator.clipboard.writeText(t).catch(() => {});
-      this._toast(this.STR[L].toastCopied);
+      // Only claim "Link copied" when the write actually succeeds — on insecure
+      // origins / old browsers clipboard is unavailable and the toast would lie.
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(t)
+          .then(() => this._toast(this.STR[L].toastCopied))
+          .catch(() => {});
+      }
     }
   };
   _toast(msg) {
@@ -196,9 +212,11 @@ export class GameEngine {
     // the rank title/blurb live when the language is toggled on the game-over screen.
     let rkIdx = 0;
     for (let i = 0; i < this.RANKS.length; i++) if (this.bricksCaught >= this.RANKS[i].min) rkIdx = i;
-    const best = Math.max(this.best, this.score);
+    // Record is tracked in BRICKS so it matches the rank/share story (which both
+    // speak in bricks), not in raw points.
+    const best = Math.max(this.best, this.bricksCaught);
     this.best = best;
-    try { localStorage.setItem("bbwb_best", String(best)); } catch (e) {}
+    try { localStorage.setItem("bbwb_best_bricks", String(best)); } catch (e) {}
     this.finalScore = this.score; this.finalBricks = this.bricksCaught; this.finalCombo = this.bestCombo;
     this.onScreen("over", {
       finalScore: this.score, finalBricks: this.bricksCaught, finalCombo: this.bestCombo,
@@ -214,7 +232,9 @@ export class GameEngine {
     const x = (Math.random() * 2 - 1) * half;
     if (isOb) {
       const arr = this.OBST[this._lang];
-      this.items.push({ x, z: this.zFar, ob: true, label: arr[(Math.random() * arr.length) | 0], done: false, hop: 0 });
+      // store the obstacle INDEX, not the localized string, so the label
+      // re-translates live if the player toggles language mid-run.
+      this.items.push({ x, z: this.zFar, ob: true, obIdx: (Math.random() * arr.length) | 0, done: false, hop: 0 });
     } else {
       this.items.push({ x, z: this.zFar, ob: false, done: false, hop: Math.random() * 0.4 });
     }
@@ -229,8 +249,8 @@ export class GameEngine {
   loop = (ts) => {
     let dt = (ts - this.last) / 1000; this.last = ts;
     if (dt > 0.05) dt = 0.05;
-    this._update(dt);
-    this._draw();
+    // Never let a single bad frame kill the rAF loop permanently.
+    try { this._update(dt); this._draw(); } catch (e) {}
     this.raf = requestAnimationFrame(this.loop);
   };
 
@@ -298,10 +318,11 @@ export class GameEngine {
   }
 
   _hit() {
-    this.lives--; this.combo = 0; this.comboMult = 1; this.shake = 9;
+    this.lives--; this.combo = 0; this.comboMult = 1; this.shake = this.reduceMotion ? 0 : 9;
     if (this.lives <= 0) this._gameOver();
   }
   _burst(worldX, color) {
+    if (this.reduceMotion) return;
     const p = this.project(worldX, this.zNear + 0.1, 0.3);
     for (let i = 0; i < 12; i++) {
       const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 160;
@@ -335,10 +356,8 @@ export class GameEngine {
     const W = this.W, H = this.H;
     ctx.save();
     if (this.shake > 0) ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
-    // sky
-    let g = ctx.createLinearGradient(0, 0, 0, this.horizon + 40);
-    g.addColorStop(0, this.COL.skyTop); g.addColorStop(1, this.COL.skyBot);
-    ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, this.horizon + 60);
+    // sky (gradient cached in _resize)
+    ctx.fillStyle = this._skyGrad; ctx.fillRect(-20, -20, W + 40, this.horizon + 60);
     // grass
     ctx.fillStyle = this.COL.grass; ctx.fillRect(-20, this.horizon - 1, W + 40, H - this.horizon + 40);
     // distant hill band
@@ -426,11 +445,17 @@ export class GameEngine {
     this._drawIcon(b.cm.icon, left + iconW / 2, bodyY + bodyH / 2, Math.min(iconW, bodyH) * 0.6, b.cm.c);
     ctx.restore();
     const colX = left + iconW, colW = bw - iconW, tx = colX + colW / 2, tw = colW - sc * 0.22;
-    // title
+    // title — auto-shrink the font so long names (e.g. "Beard on! Pentru cei
+    // în nevoie") still fit within 2 lines instead of being clipped.
     ctx.fillStyle = "#2B2A28";
-    const tsz = Math.max(8, bh * 0.135);
+    let tsz = Math.max(8, bh * 0.135);
     ctx.font = "700 " + tsz + "px 'Baloo 2', sans-serif";
-    const lines = this._wrap(ctx, b.cm[L], tw);
+    let lines = this._wrap(ctx, b.cm[L], tw);
+    while (lines.length > 2 && tsz > 7) {
+      tsz -= 1;
+      ctx.font = "700 " + tsz + "px 'Baloo 2', sans-serif";
+      lines = this._wrap(ctx, b.cm[L], tw);
+    }
     let ty = bodyY + bodyH * 0.33 - (lines.length > 1 ? tsz * 0.5 : 0);
     for (let i = 0; i < Math.min(lines.length, 2); i++) { ctx.fillText(lines[i], tx, ty); ty += tsz * 1.05; }
     // stat
@@ -560,10 +585,11 @@ export class GameEngine {
       ctx.beginPath(); ctx.arc(pr.sx, pr.sy - r * 0.7, r, 0, 7); ctx.fill();
       ctx.fillStyle = this.COL.obst;
       ctx.beginPath(); ctx.arc(pr.sx - r * 0.18, pr.sy - r * 0.85, r * 0.82, 0, 7); ctx.fill();
-      if (pr.p > 0.22 && it.label) {
+      const label = this.OBST[this._lang][it.obIdx];
+      if (pr.p > 0.22 && label) {
         ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.font = "800 " + Math.max(8, r * 0.42) + "px 'Nunito', sans-serif";
-        ctx.fillText(it.label, pr.sx, pr.sy - r * 0.7);
+        ctx.fillText(label, pr.sx, pr.sy - r * 0.7);
       }
     } else {
       // isometric brick

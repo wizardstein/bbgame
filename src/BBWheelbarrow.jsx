@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { GameEngine } from "./game/GameEngine.js";
+import { Analytics } from "@vercel/analytics/react";
+import { track } from "@vercel/analytics";
 
 // UI string table (DOM overlays). Kept in sync with GameEngine.STR — single source
 // later via CMS/i18n. The engine owns the canvas-rendered strings + obstacle labels.
@@ -29,6 +31,7 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
   const canvasRef = useRef(null);
   const engineRef = useRef(null);
   const hud = useRef({ score: null, lives: [null, null, null], combo: null, mult: null, toast: null });
+  const primaryBtnRef = useRef(null);
 
   const [screen, setScreen] = useState("start");
   const [lang, setLang] = useState(defaultLang === "en" ? "en" : "ro");
@@ -42,6 +45,9 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
       onScreen: (scr, r) => {
         setScreen(scr);
         if (r) { setRes(r); setBest(r.best); }
+        // Vercel Web Analytics — cookieless, no PII, no consent banner needed.
+        if (scr === "playing") track("game_start");
+        else if (scr === "over" && r) track("game_over", { score: r.finalScore, bricks: r.finalBricks, combo: r.finalCombo });
       },
       onLang: (l) => setLang(l),
     });
@@ -55,6 +61,14 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
       engineRef.current = null;
     };
   }, [difficulty, defaultLang]);
+
+  // keep <html lang> in sync with the in-game language toggle (screen readers)
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
+
+  // move keyboard focus to the primary action when a menu screen appears
+  useEffect(() => {
+    if (screen === "start" || screen === "over") primaryBtnRef.current?.focus();
+  }, [screen]);
 
   const e = () => engineRef.current;
   const t = STR[lang] || STR.ro;
@@ -74,11 +88,12 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
       onPointerUp={() => e() && e().onUp()}
       onPointerLeave={() => e() && e().onUp()}
     >
-      <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }} />
+      <canvas ref={canvasRef} aria-label={lang === "ro" ? "Joc Beard Brothers — prinde cărămizile mișcând roaba cu degetul sau cu săgețile" : "Beard Brothers game — catch the bricks by moving the wheelbarrow with touch or arrow keys"} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }} />
 
       {/* LANG PILL (always) */}
       <button
         onClick={() => e() && e().toggleLang()}
+        aria-label={lang === "ro" ? "Switch to English" : "Comută în română"}
         style={{
           position: "absolute", top: 14, right: 14, zIndex: 40, pointerEvents: "auto", border: "none",
           cursor: "pointer", fontFamily: FRED, fontWeight: 600, fontSize: 14, color: "#2B2A28",
@@ -112,7 +127,9 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
             ))}
           </div>
           <div ref={(el) => (hud.current.combo = el)} style={{ position: "absolute", top: "24%", left: 0, right: 0, textAlign: "center", fontFamily: FRED, fontWeight: 700, fontSize: 30, color: "#fff", textShadow: "0 2px 0 #C96A23,0 4px 10px rgba(0,0,0,.25)", opacity: 0, transition: "opacity .15s" }} />
-          <div style={{ position: "absolute", bottom: 18, left: 0, right: 0, textAlign: "center", fontFamily: FRED, fontWeight: 500, fontSize: 15, color: "rgba(255,255,255,.92)", textShadow: "0 1px 4px rgba(0,0,0,.35)" }}>↤ {t.hint} ↦</div>
+          <div style={{ position: "absolute", bottom: 18, left: 0, right: 0, textAlign: "center" }}>
+            <span style={{ display: "inline-block", fontFamily: FRED, fontWeight: 600, fontSize: 15, color: "#fff", background: "rgba(20,30,38,.6)", padding: "5px 14px", borderRadius: 999 }}>↤ {t.hint} ↦</span>
+          </div>
         </div>
       )}
 
@@ -130,8 +147,8 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
                 </div>
               ))}
             </div>
-            <button onClick={() => e() && e().startGame()} style={{ width: "100%", border: "none", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 21, color: "#fff", background: "linear-gradient(#F08C3E,#E0701F)", borderRadius: 16, padding: 16, boxShadow: "0 6px 0 #B6541A,0 10px 20px rgba(224,112,31,.4)" }}>{t.play}</button>
-            <div style={{ marginTop: 14, fontSize: 13, fontWeight: 700, color: "#A79B86" }}>{bestLine}</div>
+            <button ref={primaryBtnRef} onClick={() => e() && e().startGame()} style={{ width: "100%", border: "none", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 21, color: "#fff", background: "linear-gradient(#F08C3E,#E0701F)", borderRadius: 16, padding: 16, boxShadow: "0 6px 0 #B6541A,0 10px 20px rgba(224,112,31,.4)" }}>{t.play}</button>
+            <div style={{ marginTop: 14, fontSize: 13, fontWeight: 700, color: "#6F6452" }}>{bestLine}</div>
           </div>
         </div>
       )}
@@ -141,19 +158,20 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
         <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", alignItems: "center", justifyContent: "center", padding: 22, background: "linear-gradient(180deg,rgba(20,40,55,.28),rgba(20,40,55,.62))" }}>
           <div style={{ width: "100%", maxWidth: 390, background: "#FBF4E6", borderRadius: 26, padding: 26, boxShadow: "0 24px 60px rgba(0,0,0,.36)", animation: "bbPop .32s ease both", textAlign: "center" }}>
             <div style={{ fontFamily: FRED, fontWeight: 600, fontSize: 12, letterSpacing: ".16em", textTransform: "uppercase", color: "#C96A23" }}>{t.yourRank}</div>
-            <h2 style={{ fontFamily: FRED, fontWeight: 700, fontSize: 30, lineHeight: 1.05, margin: "4px 0 18px", color: "#2B2A28" }}>{rank ? rank[0] : ""}</h2>
+            <h2 style={{ fontFamily: FRED, fontWeight: 700, fontSize: 30, lineHeight: 1.05, margin: "4px 0 6px", color: "#2B2A28" }}>{rank ? rank[0] : ""}</h2>
+            <p style={{ margin: "0 0 18px", fontSize: 14, fontWeight: 600, color: "#6F6452", lineHeight: 1.4 }}>{rank ? rank[1] : ""}</p>
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {[[res.finalScore, t.scoreLabel, "#E0701F"], [res.finalBricks, t.bricks, "#C0512B"], [res.finalCombo, t.bestCombo, "#2B2A28"]].map(([val, label, col], i) => (
                 <div key={i} style={{ flex: 1, background: "#fff", borderRadius: 16, padding: "14px 8px" }}>
                   <div style={{ fontFamily: FRED, fontWeight: 700, fontSize: 30, color: col, lineHeight: 1 }}>{val}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "#A79B86", marginTop: 3 }}>{label}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "#6F6452", marginTop: 3 }}>{label}</div>
                 </div>
               ))}
             </div>
             <p style={{ margin: "0 0 16px", fontSize: 13.5, fontWeight: 600, color: "#5C5648", lineHeight: 1.45 }}>{t.overNote}</p>
-            <button onClick={() => e() && e().buyBrick()} style={{ width: "100%", border: "none", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 19, color: "#fff", background: "linear-gradient(#F08C3E,#E0701F)", borderRadius: 16, padding: 15, boxShadow: "0 5px 0 #B6541A,0 10px 18px rgba(224,112,31,.36)", marginBottom: 10 }}>🧱 {t.buy}</button>
+            <button ref={primaryBtnRef} onClick={() => { track("buy_brick_click"); e() && e().buyBrick(); }} style={{ width: "100%", border: "none", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 19, color: "#fff", background: "linear-gradient(#F08C3E,#E0701F)", borderRadius: 16, padding: 15, boxShadow: "0 5px 0 #B6541A,0 10px 18px rgba(224,112,31,.36)", marginBottom: 10 }}>🧱 {t.buy}</button>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => e() && e().shareScore()} style={{ flex: 1, border: "2px solid #E0701F", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 16, color: "#E0701F", background: "#fff", borderRadius: 14, padding: 12 }}>{t.share}</button>
+              <button onClick={() => { track("share_click"); e() && e().shareScore(); }} style={{ flex: 1, border: "2px solid #E0701F", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 16, color: "#E0701F", background: "#fff", borderRadius: 14, padding: 12 }}>{t.share}</button>
               <button onClick={() => e() && e().startGame()} style={{ flex: 1, border: "none", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 16, color: "#2B2A28", background: "#EFE6D2", borderRadius: 14, padding: 12 }}>{t.again}</button>
             </div>
           </div>
@@ -162,6 +180,7 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
 
       {/* TOAST */}
       <div ref={(el) => (hud.current.toast = el)} style={{ position: "absolute", bottom: 74, left: "50%", transform: "translateX(-50%)", zIndex: 50, background: "#2B2A28", color: "#fff", fontWeight: 700, fontSize: 14, padding: "10px 18px", borderRadius: 999, opacity: 0, transition: "opacity .25s", pointerEvents: "none" }} />
+      <Analytics />
     </div>
   );
 }
