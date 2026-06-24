@@ -32,8 +32,7 @@ export class GameEngine {
 
   // ---- static content ----
   STR = {
-    // cedilla ş/Ş in the title — see BBWheelbarrow.jsx note (Fredoka comma-below wrap bug)
-    ro: { langBtn: "EN", title: "Construieşte Şcoala", sub: "un joc Beard Brothers",
+    ro: { langBtn: "EN", title: "Construiește Școala", sub: "un joc Beard Brothers",
       how1: "Trage stânga–dreapta ca să prinzi cărămizile", how2: "Ferește roaba de prejudecată, indiferență, birocrație și stereotip", how3: "3 greșeli și zidul se prăbușește",
       play: "Joacă", hint: "trage cu degetul ca să muți roaba", scoreLabel: "puncte", yourRank: "Rangul tău",
       bricks: "cărămizi", bestCombo: "combo", again: "Încă o tură", buy: "Cumpără o cărămidă", share: "Distribuie",
@@ -60,12 +59,14 @@ export class GameEngine {
     { c: "#C96A23", icon: "wall", ro: "Beard Brothers School", en: "Beard Brothers School", sro: "€302.540 · o școală", sen: "€302,540 · a school" },
   ];
   OBST = { ro: ["prejudecată", "indiferență", "birocrație", "stereotip"], en: ["prejudice", "indifference", "red tape", "stereotype"] };
+  // Thresholds in bricks caught. Tuned so "legend" (~250) is a genuine achievement —
+  // a relaxed run lands around 260, so legend should sit right about there.
   RANKS = [
     { min: 0, ro: ["Trecător curios", "Te-ai oprit din drum — bun început!"], en: ["Curious passer-by", "You stopped to look — nice start!"] },
-    { min: 18, ro: ["Voluntar nou", "Mâinile încep să prindă ritm."], en: ["Rookie volunteer", "Your hands are finding the rhythm."] },
-    { min: 42, ro: ["Frate bărbos", "Zidul crește văzând cu ochii."], en: ["Bearded brother", "The wall is rising fast."] },
-    { min: 85, ro: ["Maistru de nădejde", "Școala se ridică datorită ție."], en: ["Trusted foreman", "The school is rising thanks to you."] },
-    { min: 150, ro: ["Legendă Beard Brothers", "Bărboșii îți ridică pălăria."], en: ["Beard Brothers legend", "The bearded ones salute you."] },
+    { min: 45, ro: ["Voluntar nou", "Mâinile încep să prindă ritm."], en: ["Rookie volunteer", "Your hands are finding the rhythm."] },
+    { min: 105, ro: ["Frate bărbos", "Zidul crește văzând cu ochii."], en: ["Bearded brother", "The wall is rising fast."] },
+    { min: 175, ro: ["Maistru de nădejde", "Școala se ridică datorită ție."], en: ["Trusted foreman", "The school is rising thanks to you."] },
+    { min: 250, ro: ["Legendă Beard Brothers", "Bărboșii îți ridică pălăria."], en: ["Beard Brothers legend", "The bearded ones salute you."] },
   ];
 
   // ---- colors ----
@@ -274,7 +275,8 @@ export class GameEngine {
             if (reach) {
               this.bricksCaught++; this.combo++; this.bestCombo = Math.max(this.bestCombo, this.combo);
               const prevMult = this.comboMult;
-              this.comboMult = Math.min(1 + Math.floor(this.combo / 4), 6);
+              // multiplier = +1 every 4 consecutive catches, capped at ×10
+              this.comboMult = Math.min(1 + Math.floor(this.combo / 4), 10);
               this.score += 12 * this.comboMult;
               this._burst(this.player.x, "#E0701F");
               // pop the combo popup once per new multiplier tier, then let it fade
@@ -307,7 +309,7 @@ export class GameEngine {
   }
   _showCombo() {
     const el = this.hud.combo; if (!el) return;
-    el.textContent = "x" + this.comboMult + (this._lang === "ro" ? "  combo!" : "  combo!");
+    el.textContent = "×" + this.comboMult + " combo!";
   }
   _updateHud() {
     if (this.hud.score) this.hud.score.textContent = this.score;
@@ -319,6 +321,11 @@ export class GameEngine {
       el.style.boxShadow = ok ? "inset 0 -2px 0 rgba(0,0,0,.18)" : "inset 0 -2px 0 rgba(0,0,0,.1)";
     }
     if (this.hud.combo) this.hud.combo.style.opacity = this.comboTimer > 0 ? String(Math.min(1, this.comboTimer * 2)) : "0";
+    // persistent multiplier badge — stays visible for the whole active combo
+    if (this.hud.mult) {
+      if (this.comboMult > 1) { this.hud.mult.textContent = "×" + this.comboMult; this.hud.mult.style.opacity = "1"; }
+      else this.hud.mult.style.opacity = "0";
+    }
   }
 
   // ---- drawing ----

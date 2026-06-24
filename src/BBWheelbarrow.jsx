@@ -4,10 +4,10 @@ import { GameEngine } from "./game/GameEngine.js";
 // UI string table (DOM overlays). Kept in sync with GameEngine.STR — single source
 // later via CMS/i18n. The engine owns the canvas-rendered strings + obstacle labels.
 const STR = {
-  // NB: the big Fredoka title uses cedilla ş/Ş (U+015F/U+015E), not comma ș/Ș, because
-  // Fredoka detaches comma-below marks when the title wraps to two line-boxes. Everything
-  // else is Nunito (no such bug) and keeps the correct Romanian comma ș/ț.
-  ro: { langBtn: "EN", title: "Construieşte Şcoala", sub: "un joc Beard Brothers",
+  // Correct Romanian comma diacritics ș/ț throughout. The browser detaches comma-below
+  // marks when text wraps across line-boxes, so the title is kept on a single line
+  // (white-space:nowrap + responsive size in the h1) where it renders cleanly.
+  ro: { langBtn: "EN", title: "Construiește Școala", sub: "un joc Beard Brothers",
     how1: "Trage stânga–dreapta ca să prinzi cărămizile", how2: "Ferește roaba de prejudecată, indiferență, birocrație și stereotip", how3: "3 greșeli și zidul se prăbușește",
     play: "Joacă", hint: "trage cu degetul ca să muți roaba", scoreLabel: "puncte", yourRank: "Rangul tău",
     bricks: "cărămizi", bestCombo: "combo", again: "Încă o tură", buy: "Cumpără o cărămidă", share: "Distribuie",
@@ -26,7 +26,7 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const engineRef = useRef(null);
-  const hud = useRef({ score: null, lives: [null, null, null], combo: null, toast: null });
+  const hud = useRef({ score: null, lives: [null, null, null], combo: null, mult: null, toast: null });
 
   const [screen, setScreen] = useState("start");
   const [lang, setLang] = useState(defaultLang === "en" ? "en" : "ro");
@@ -95,6 +95,10 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
           }}>
             <span style={{ display: "inline-block", width: 22, height: 15, borderRadius: 3, background: "linear-gradient(#D6663C,#B6481F)", boxShadow: "inset 0 -2px 0 rgba(0,0,0,.18)" }} />
             <span ref={(el) => (hud.current.score = el)} style={{ fontFamily: FRED, fontWeight: 700, fontSize: 22, color: "#2B2A28", lineHeight: 1 }}>0</span>
+            <span
+              ref={(el) => (hud.current.mult = el)}
+              style={{ fontFamily: FRED, fontWeight: 700, fontSize: 16, color: "#fff", background: "linear-gradient(#F0973E,#E0701F)", borderRadius: 8, padding: "1px 7px", lineHeight: 1.3, opacity: 0, transition: "opacity .15s" }}
+            />
           </div>
           <div style={{ position: "absolute", top: 54, left: 14, display: "flex", gap: 6 }}>
             {[0, 1, 2].map((i) => (
@@ -111,7 +115,7 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
         <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", alignItems: "center", justifyContent: "center", padding: 22, background: "linear-gradient(180deg,rgba(20,40,55,.18),rgba(20,40,55,.5))" }}>
           <div style={{ width: "100%", maxWidth: 380, background: "#FBF4E6", borderRadius: 26, padding: "30px 26px 26px", boxShadow: "0 24px 60px rgba(0,0,0,.32)", animation: "bbPop .35s ease both", textAlign: "center" }}>
             <div style={{ fontFamily: FRED, fontWeight: 600, fontSize: 12, letterSpacing: ".18em", textTransform: "uppercase", color: "#C96A23" }}>Beard Brothers</div>
-            <h1 style={{ fontFamily: FRED, fontWeight: 700, fontSize: 40, lineHeight: 1.02, margin: "8px 0 4px", color: "#2B2A28" }}>{t.title}</h1>
+            <h1 style={{ fontFamily: FRED, fontWeight: 700, fontSize: "clamp(20px, 7.4vw, 38px)", whiteSpace: "nowrap", lineHeight: 1.04, margin: "6px 0 4px", color: "#2B2A28" }}>{t.title}</h1>
             <p style={{ margin: "0 0 20px", fontSize: 15, fontWeight: 600, color: "#7A7468" }}>{t.sub}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 9, textAlign: "left", marginBottom: 22 }}>
               {[["#EE8B3D", "1", t.how1], ["#8A8782", "2", t.how2], ["#C0512B", "3", t.how3]].map(([bg, n, txt]) => (
