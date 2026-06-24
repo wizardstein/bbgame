@@ -35,12 +35,12 @@ export class GameEngine {
     ro: { langBtn: "EN", title: "Construiește Școala", sub: "un joc Beard Brothers",
       how1: "Trage stânga–dreapta ca să prinzi cărămizile", how2: "Ferește roaba de prejudecată, indiferență, birocrație și stereotip", how3: "3 greșeli și zidul se prăbușește",
       play: "Joacă", hint: "trage cu degetul ca să muți roaba", scoreLabel: "puncte", yourRank: "Rangul tău",
-      bricks: "cărămizi", bestCombo: "combo", again: "Încă o tură", buy: "Cumpără o cărămidă", share: "Distribuie",
+      bricks: "cărămizi", bestCombo: "combo", again: "Încă o tură", buy: "Donează o cărămidă", share: "Distribuie",
       overNote: "Fiecare cărămidă reală ridică școala Beard Brothers, în Florești.", best: "Record", toastCopied: "Link copiat — distribuie!" },
     en: { langBtn: "RO", title: "Build the School", sub: "a Beard Brothers game",
       how1: "Drag left–right to catch the bricks", how2: "Keep prejudice, indifference, red tape & stereotypes out", how3: "3 misses and the wall collapses",
       play: "Play", hint: "drag to move the wheelbarrow", scoreLabel: "points", yourRank: "Your rank",
-      bricks: "bricks", bestCombo: "combo", again: "Play again", buy: "Buy a brick", share: "Share",
+      bricks: "bricks", bestCombo: "combo", again: "Play again", buy: "Donate a brick", share: "Share",
       overNote: "Every real brick raises the Beard Brothers school in Florești.", best: "Best", toastCopied: "Link copied — share it!" },
   };
   CAMPS = [

@@ -10,12 +10,12 @@ const STR = {
   ro: { langBtn: "EN", title: "Construiește Școala", sub: "un joc Beard Brothers",
     how1: "Trage stânga–dreapta ca să prinzi cărămizile", how2: "Ferește roaba de prejudecată, indiferență, birocrație și stereotip", how3: "3 greșeli și zidul se prăbușește",
     play: "Joacă", hint: "trage cu degetul ca să muți roaba", scoreLabel: "puncte", yourRank: "Rangul tău",
-    bricks: "cărămizi", bestCombo: "combo", again: "Încă o tură", buy: "Cumpără o cărămidă", share: "Distribuie",
+    bricks: "cărămizi", bestCombo: "combo", again: "Încă o tură", buy: "Donează o cărămidă", share: "Distribuie",
     overNote: "Fiecare cărămidă reală ridică școala Beard Brothers, în Florești.", best: "Record" },
   en: { langBtn: "RO", title: "Build the School", sub: "a Beard Brothers game",
     how1: "Drag left–right to catch the bricks", how2: "Keep prejudice, indifference, red tape & stereotypes out", how3: "3 misses and the wall collapses",
     play: "Play", hint: "drag to move the wheelbarrow", scoreLabel: "points", yourRank: "Your rank",
-    bricks: "bricks", bestCombo: "combo", again: "Play again", buy: "Buy a brick", share: "Share",
+    bricks: "bricks", bestCombo: "combo", again: "Play again", buy: "Donate a brick", share: "Share",
     overNote: "Every real brick raises the Beard Brothers school in Florești.", best: "Best" },
 };
 
@@ -99,11 +99,13 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
           }}>
             <span style={{ display: "inline-block", width: 22, height: 15, borderRadius: 3, background: "linear-gradient(#D6663C,#B6481F)", boxShadow: "inset 0 -2px 0 rgba(0,0,0,.18)" }} />
             <span ref={(el) => (hud.current.score = el)} style={{ fontFamily: FRED, fontWeight: 700, fontSize: 22, color: "#2B2A28", lineHeight: 1 }}>0</span>
-            <span
-              ref={(el) => (hud.current.mult = el)}
-              style={{ fontFamily: FRED, fontWeight: 700, fontSize: 16, color: "#fff", background: "linear-gradient(#F0973E,#E0701F)", borderRadius: 8, padding: "1px 7px", lineHeight: 1.3, opacity: 0, transition: "opacity .15s" }}
-            />
           </div>
+          {/* combo multiplier — top-right, separate from the score so it doesn't read
+              as if the final score is multiplied by it */}
+          <div
+            ref={(el) => (hud.current.mult = el)}
+            style={{ position: "absolute", top: 56, right: 14, fontFamily: FRED, fontWeight: 700, fontSize: 20, color: "#fff", background: "linear-gradient(#F0973E,#E0701F)", borderRadius: 10, padding: "3px 13px", boxShadow: "0 2px 8px rgba(0,0,0,.2)", opacity: 0, transition: "opacity .15s" }}
+          />
           <div style={{ position: "absolute", top: 54, left: 14, display: "flex", gap: 6 }}>
             {[0, 1, 2].map((i) => (
               <div key={i} ref={(el) => (hud.current.lives[i] = el)} style={{ width: 18, height: 13, borderRadius: 3, background: "#EE8B3D", boxShadow: "inset 0 -2px 0 rgba(0,0,0,.18)" }} />
