@@ -136,7 +136,9 @@ export class GameEngine {
     this.ctx = c.getContext("2d");
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.cx = this.W / 2;
-    this.horizon = this.H * 0.32;
+    // Portrait screens get a slightly higher horizon (less empty sky) so the
+    // road + props fill more of the tall viewport and read closer.
+    this.horizon = this.H * (this.W / this.H < 0.72 ? 0.28 : 0.32);
     // Cache the static sky gradient (only changes on resize) instead of rebuilding
     // it every frame in _draw.
     this._skyGrad = this.ctx.createLinearGradient(0, 0, 0, this.horizon + 40);
@@ -147,7 +149,7 @@ export class GameEngine {
     // desktop view. To keep things on-screen at the bigger scale we tighten the player
     // travel (maxX) and the brick spawn band so nothing flies past the screen edges.
     const aspect = this.W / this.H;
-    this.zoom = aspect < 0.72 ? Math.min(1.6, 1 + (0.72 - aspect) * 2.4) : 1;
+    this.zoom = aspect < 0.72 ? Math.min(2.1, 1 + (0.72 - aspect) * 3.4) : 1;
     this.K = this.W * 0.15 * this.zoom;
     // Closeness comes from the zoom, not from a short road — keep items spawning far
     // (zFar) and draw the road all the way to the horizon (roadFar) so it converges to
