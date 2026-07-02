@@ -6,6 +6,51 @@
 
 import { Sfx } from "./Sfx.js";
 
+// Copy text with a legacy fallback (lesson learned on the brickbybrick
+// donation platform): navigator.clipboard is missing or throws inside in-app
+// webviews (e.g. the Facebook/Instagram browser — exactly where a shared game
+// link gets opened), where execCommand('copy') still works. Returns whether a
+// copy succeeded.
+async function copyText(value) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch (e) { /* fall through to the legacy path */ }
+  try {
+    // iOS Safari won't copy from a plain textarea.select() — it needs a
+    // contentEditable element with an explicit Range selection.
+    const ta = document.createElement("textarea");
+    ta.value = value;
+    ta.contentEditable = "true";
+    ta.readOnly = false;
+    ta.style.position = "fixed";
+    ta.style.top = "0";
+    ta.style.left = "0";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    const range = document.createRange();
+    range.selectNodeContents(ta);
+    const sel = window.getSelection();
+    if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+    ta.setSelectionRange(0, value.length);
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Romanian numeral–noun agreement (CLDR plurals): 1 cărămidă · 2–19 cărămizi ·
+// 20+ DE cărămizi, with the x02–x19 exception (119 cărămizi, 120 de cărămizi).
+function roBricks(n) {
+  if (n === 1) return "1 cărămidă";
+  const f = n % 100;
+  return n === 0 || (f >= 2 && f <= 19) ? n + " cărămizi" : n + " de cărămizi";
+}
+
 export class GameEngine {
   constructor(opts = {}) {
     this.props = {
@@ -272,24 +317,38 @@ export class GameEngine {
 
   toggleLang = () => { this._lang = this._lang === "ro" ? "en" : "ro"; this.onLang(this._lang); };
   buyBrick = () => { window.open("https://scoala.beard-brothers.ro/ro", "_blank", "noopener,noreferrer"); };
+  // Share flow hardened with the lessons learned on brickbybrick (see its
+  // feat(share)/fix(share) history):
+  // - navigator.share must be called synchronously in the tap — any await
+  //   first consumes the user activation and iOS silently never opens the
+  //   sheet ("3s then nothing").
+  // - Share a CLEAN canonical URL: location.href carries ?fbclid/utm junk
+  //   picked up from the very social apps shares travel through; origin+path
+  //   also keeps preview-deploy shares pointing at that preview, not prod.
+  // - The copy fallback must never feel dead: clipboard API fails silently in
+  //   in-app webviews (FB/IG browser), so copyText has an execCommand path
+  //   and we confirm with a toast on tap regardless.
+  // - #ScoalaDeMeserii clusters game shares with the donation platform's.
+  // - Romanian plural: "120 DE cărămizi", not "120 cărămizi" (roBricks).
   shareScore = () => {
     const L = this._lang;
+    const n = this.finalBricks;
     const txt = L === "ro"
-      ? `Am prins ${this.finalBricks} cărămizi pentru școala Beard Brothers! Joacă și tu:`
-      : `I caught ${this.finalBricks} bricks for the Beard Brothers school! Play it:`;
-    const url = location.href;
-    if (navigator.share) { navigator.share({ title: "Beard Brothers", text: txt, url }).catch(() => {}); }
-    else {
-      const t = txt + " " + url;
-      // Only claim "Link copied" when the write actually succeeds — on insecure
-      // origins / old browsers clipboard is unavailable and the toast would lie.
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(t)
-          .then(() => this._toast(this.STR[L].toastCopied))
-          .catch(() => {});
-      }
+      ? `Am prins ${roBricks(n)} pentru Școala Beard Brothers din Florești! 🧱 Joacă și tu, cărămidă cu cărămidă. #ScoalaDeMeserii`
+      : `I caught ${n} ${n === 1 ? "brick" : "bricks"} for the Beard Brothers School in Florești! 🧱 Play it, brick by brick. #ScoalaDeMeserii`;
+    const url = location.origin + location.pathname;
+    if (navigator.share) {
+      navigator.share({ title: "Beard Brothers", text: txt, url }).catch((err) => {
+        // user cancelling the sheet is fine; real failures fall back to copy
+        if (!err || err.name !== "AbortError") this._copyShare(txt, url);
+      });
+    } else {
+      this._copyShare(txt, url);
     }
   };
+  _copyShare(txt, url) {
+    copyText(txt + " " + url).then(() => this._toast(this.STR[this._lang].toastCopied));
+  }
   _toast(msg) {
     const el = this.hud.toast; if (!el) return;
     el.textContent = msg; el.style.opacity = "1";
