@@ -25,10 +25,11 @@ const STR = {
     nextRank: (n, r) => `${n} more bricks to “${r}”`, wallAlt: "your bricks" },
 };
 
-// game-over star rating — filled stars pop in left to right
+// game-over star rating — filled stars pop in left to right (7 ranks → 24px
+// stars so the full row still fits a 320px-wide card)
 function Star({ filled, delay }) {
   return (
-    <svg viewBox="0 0 24 24" width="27" height="27" aria-hidden="true"
+    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"
       style={{ display: "block", ...(filled ? { animation: `bbStarPop .45s ease ${delay}s both` } : {}) }}>
       <path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8-6.1-3.4-6.1 3.4 1.4-6.8-5.1-4.7 6.9-.8z"
         fill={filled ? "#F2B33A" : "#E7DCC5"} stroke={filled ? "#D9910F" : "#D5C8AD"} strokeWidth="1" strokeLinejoin="round" />
@@ -271,8 +272,8 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
             )}
             <div style={{ maxHeight: "86vh", overflowY: "auto", WebkitOverflowScrolling: "touch", background: "#FBF4E6", borderRadius: 26, padding: 24, boxShadow: "0 24px 60px rgba(0,0,0,.36)", animation: "bbPop .32s ease both", textAlign: "center" }}>
               <div style={{ fontFamily: FRED, fontWeight: 600, fontSize: 12, letterSpacing: ".16em", textTransform: "uppercase", color: "#C96A23" }}>{t.yourRank}</div>
-              <div style={{ display: "flex", justifyContent: "center", gap: 5, margin: "9px 0 4px" }}>
-                {[0, 1, 2, 3, 4].map((i) => (
+              <div style={{ display: "flex", justifyContent: "center", gap: 4, margin: "9px 0 4px" }}>
+                {Array.from({ length: engineRef.current ? engineRef.current.RANKS.length : 5 }).map((_, i) => (
                   <Star key={i} filled={i <= res.rankIdx} delay={0.4 + i * 0.15} />
                 ))}
               </div>
@@ -287,7 +288,7 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
                   </div>
                 ))}
               </div>
-              {res.rankIdx < 4 && engineRef.current && (() => {
+              {engineRef.current && res.rankIdx < engineRef.current.RANKS.length - 1 && (() => {
                 const next = engineRef.current.RANKS[res.rankIdx + 1];
                 const pct = Math.max(0.04, Math.min(1, res.finalBricks / next.min));
                 return (

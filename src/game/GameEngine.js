@@ -130,14 +130,20 @@ export class GameEngine {
       dro: "302.540 € adunați cărămidă cu cărămidă pentru Școala Beard Brothers din Florești — un centru de formare profesională, acum în construcție.", den: "€302,540 raised brick by brick for the Beard Brothers School in Florești — a vocational training center, now under construction." },
   ];
   OBST = { ro: ["prejudecată", "indiferență", "birocrație", "stereotip"], en: ["prejudice", "indifference", "red tape", "stereotype"] };
-  // Thresholds in bricks caught. Tuned so "legend" (~250) is a genuine achievement —
-  // a relaxed run lands around 260, so legend should sit right about there.
+  // Thresholds in bricks caught. Golden bricks + rank-up brick showers made
+  // "legend" (250) noticeably easier than the original tuning — kept as-is by
+  // design, with two hype tiers above it so mastery still has a mountain:
+  // 340/460 continue the existing ratio curve (~×1.36 per tier). The top ranks
+  // are the game REACTING to the player, so their titles are exclamations.
   RANKS = [
     { min: 0, ro: ["Trecător curios", "Un început bun, continuă!"], en: ["Curious passer-by", "A good start — keep going!"] },
     { min: 45, ro: ["Voluntar nou", "Roaba începe să se umple."], en: ["Rookie volunteer", "The wheelbarrow is filling up."] },
     { min: 105, ro: ["De-ai noștri", "Zidul crește văzând cu ochii."], en: ["One of the crew", "The wall is rising fast."] },
     { min: 175, ro: ["Maistru de nădejde", "Școala se ridică datorită ție."], en: ["Trusted foreman", "The school is rising thanks to you."] },
     { min: 250, ro: ["Legendă Beard Brothers", "Bărboșii îți ridică pălăria."], en: ["Beard Brothers legend", "The bearded ones salute you."] },
+    { min: 340, ro: ["INCREDIBIL!", "Ești de neoprit — roaba scoate scântei."], en: ["UNBELIEVABLE!", "You're unstoppable — the barrow's throwing sparks."] },
+    // the finale stays in English in both languages — that's the joke
+    { min: 460, ro: ["ARE YOU KIDDING ME?!", "Bine, gata. Ia și școala — e a ta."], en: ["ARE YOU KIDDING ME?!", "Okay, fine. Take the school — it's yours."] },
   ];
 
   // ---- colors ----
@@ -764,7 +770,9 @@ export class GameEngine {
       ctx.translate(this.cx, H * 0.3);
       ctx.scale(s, s);
       ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
-      const title = this.RANKS[bn.rankIdx][this._lang][0] + "!";
+      // top-tier titles are already exclamations — don't stack "!!"
+      const t0 = this.RANKS[bn.rankIdx][this._lang][0];
+      const title = /[!?]$/.test(t0) ? t0 : t0 + "!";
       ctx.font = "700 " + fs + "px 'Baloo 2', sans-serif";
       ctx.lineWidth = fs * 0.18; ctx.strokeStyle = "rgba(43,42,40,.9)";
       ctx.strokeText(title, 0, 0);

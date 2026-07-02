@@ -7,9 +7,31 @@
 
 const PENTA = [0, 2, 4, 7, 9]; // major pentatonic — any combo ladder step sounds musical
 
+// iPadOS 13+ masquerades as macOS, hence the maxTouchPoints check.
+const IOS = typeof navigator !== "undefined" &&
+  (/iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
+// 0.1s of 8-bit mono PCM silence as a WAV blob URL, built byte-by-byte (no
+// audio asset shipped). Used only as the iOS session-upgrade keepalive below.
+function silentWavURL() {
+  const rate = 8000, n = 800;
+  const b = new Uint8Array(44 + n);
+  const str = (off, s) => { for (let i = 0; i < s.length; i++) b[off + i] = s.charCodeAt(i); };
+  const u32 = (off, v) => { b[off] = v & 255; b[off + 1] = (v >> 8) & 255; b[off + 2] = (v >> 16) & 255; b[off + 3] = (v >> 24) & 255; };
+  const u16 = (off, v) => { b[off] = v & 255; b[off + 1] = (v >> 8) & 255; };
+  str(0, "RIFF"); u32(4, 36 + n); str(8, "WAVE");
+  str(12, "fmt "); u32(16, 16); u16(20, 1); u16(22, 1);
+  u32(24, rate); u32(28, rate); u16(32, 1); u16(34, 8);
+  str(36, "data"); u32(40, n);
+  b.fill(0x80, 44); // 8-bit PCM midpoint = silence
+  return URL.createObjectURL(new Blob([b], { type: "audio/wav" }));
+}
+
 export class Sfx {
   constructor() {
     this.ac = null;
+    this.keep = null; // iOS media-session keepalive <audio>
     this.muted = false;
     try { this.muted = localStorage.getItem("bbwb_muted") === "1"; } catch (e) {}
   }
@@ -23,13 +45,48 @@ export class Sfx {
       } catch (e) {}
     }
     if (this.ac && this.ac.state === "suspended") this.ac.resume().catch(() => {});
+    this._keepalive();
+  }
+  // iOS routes WebAudio through the RINGER channel by default, so the hardware
+  // silent switch mutes the game even with the volume buttons up — unlike
+  // native games. Promoting the audio session to "playback" moves the game to
+  // the MEDIA channel: the silent switch is ignored and the volume buttons
+  // directly set how loud the game is (there is no web API for volume-button
+  // events — this session category is the mechanism native apps use too).
+  // Two levers, both iOS-gated (elsewhere they'd only steal audio focus and
+  // pause the user's music for no benefit):
+  //  - navigator.audioSession.type = "playback" (WebKit AudioSession API);
+  //  - a looping silent <audio> element started in the first gesture — the
+  //    classic keepalive that upgrades the session on iOS versions without
+  //    the API. Paused while the in-game mute is on, so muting the game also
+  //    releases the media session.
+  _keepalive() {
+    if (!IOS || this.muted) return;
+    try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+    try {
+      if (!this.keep) {
+        this._keepURL = silentWavURL();
+        this.keep = new Audio(this._keepURL);
+        this.keep.loop = true;
+        this.keep.setAttribute("playsinline", "");
+        this.keep.preload = "auto";
+      }
+      if (this.keep.paused) this.keep.play().catch(() => {});
+    } catch (e) {}
   }
   dispose() {
     if (this.ac) { try { this.ac.close(); } catch (e) {} this.ac = null; }
+    if (this.keep) {
+      try { this.keep.pause(); this.keep.src = ""; } catch (e) {}
+      try { URL.revokeObjectURL(this._keepURL); } catch (e) {}
+      this.keep = null;
+    }
   }
   setMuted(m) {
     this.muted = !!m;
     try { localStorage.setItem("bbwb_muted", m ? "1" : "0"); } catch (e) {}
+    if (m) { if (this.keep) { try { this.keep.pause(); } catch (e) {} } }
+    else this._keepalive(); // the unmute tap is a valid gesture for play()
   }
 
   _ready() {
@@ -98,7 +155,9 @@ export class Sfx {
     [392, 523.3, 659.3, 784].forEach((f, i) => this._tone(f, { at: 0.55 + i * 0.09, d: i === 3 ? 0.35 : 0.12, type: "square", g: 0.045 }));
   }
   star(i) {
-    this._tone(523.3 * Math.pow(2, PENTA[Math.min(i, 4)] / 12), { d: 0.11, type: "triangle", g: 0.13 });
+    // keeps climbing past the 5th star (ranks 6-7 jump an octave)
+    const step = PENTA[i % 5] + 12 * Math.floor(i / 5);
+    this._tone(523.3 * Math.pow(2, step / 12), { d: 0.11, type: "triangle", g: 0.13 });
   }
   board() { this._tone(520, { f1: 720, d: 0.1, type: "sine", g: 0.09 }); }
   ui() { this._tone(440, { f1: 520, d: 0.06, type: "sine", g: 0.07 }); }
