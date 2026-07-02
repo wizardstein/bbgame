@@ -256,6 +256,16 @@ export class GameEngine {
     this.roadFar = 60;
     this.maxX = Math.min(2.15, (this.W * 0.46) / this.K);
     this._spawnHalf = Math.min(this.roadHalf - 0.55, (this.W * 0.5) / this.K - 0.15);
+    // Billboards hold at holdZ so they can be read/tapped, but on zoomed-in
+    // portrait screens the default roadside spot projects past the screen edge
+    // (the panel showed ~60% cut off on phones). Pull the post a bit toward the
+    // road on portrait and back the hold distance off until the whole panel
+    // (center offset + half of the 2.55-wide panel + shadow) fits with a margin.
+    this.boardOff = this.roadHalf + (aspect < 0.72 ? 0.7 : 1.15);
+    const pFit = (this.W / 2 - 12) / (this.K * (this.boardOff + 1.4));
+    this.holdZ = Math.max(2.5, 1 / Math.max(pFit, 0.06));
+    // a board already holding nearer than the new distance would sit clipped
+    if (this.boards) for (const b of this.boards) if (b.phase !== "out" && b.z < this.holdZ) b.z = this.holdZ;
   }
 
   project(x, z, y) {
@@ -848,7 +858,7 @@ export class GameEngine {
 
   _drawBoard(b) {
     const ctx = this.ctx;
-    const base = this.project(b.side * (this.roadHalf + 1.15), b.z, 0);
+    const base = this.project(b.side * this.boardOff, b.z, 0);
     if (base.p <= 0.05) return;
     const sc = this.K * base.p;
     const poleH = 1.5 * sc, bw = 2.55 * sc, bh = 1.7 * sc, pw = Math.max(2, 0.13 * sc);
