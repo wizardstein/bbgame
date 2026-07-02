@@ -1,10 +1,10 @@
 // Beard Brothers — "Brick Catcher" game engine.
-// Ported verbatim from the Claude Design handoff (Brick Catcher.dc.html, `class Component`)
+// Ported from the Claude Design handoff (Brick Catcher.dc.html, `class Component`)
 // into a framework-agnostic vanilla Canvas2D engine. The React shell (BBWheelbarrow.jsx)
 // mounts it onto a <canvas>, feeds it HUD DOM nodes for imperative per-frame updates,
-// and subscribes to onScreen / onLang callbacks for screen + language transitions.
-//
-// Gameplay, projection, tuning, drawing and content are unchanged from the design.
+// and subscribes to onScreen / onLang / onBoard / onEvent callbacks.
+
+import { Sfx } from "./Sfx.js";
 
 export class GameEngine {
   constructor(opts = {}) {
@@ -15,8 +15,10 @@ export class GameEngine {
     this.onScreen = opts.onScreen || (() => {});
     this.onLang = opts.onLang || (() => {});
     this.onBoard = opts.onBoard || (() => {});
+    this.onEvent = opts.onEvent || (() => {}); // analytics hook (rank_up, …)
+    this.sfx = new Sfx();
     // HUD DOM nodes are assigned by React via callback refs (same object reference).
-    this.hud = { score: null, lives: [null, null, null], combo: null, toast: null };
+    this.hud = { score: null, lives: [null, null, null], combo: null, mult: null, toast: null, rankBar: null, rankLabel: null, hint: null };
 
     this._lang = this.props.defaultLang === "en" ? "en" : "ro";
     let best = 0;
@@ -42,12 +44,14 @@ export class GameEngine {
       how1: "Trage stânga–dreapta ca să prinzi cărămizile", how2: "Ferește roaba de prejudecată, indiferență, birocrație și stereotip", how3: "3 greșeli și zidul se prăbușește",
       play: "Joacă", hint: "trage cu degetul ca să muți roaba", scoreLabel: "puncte", yourRank: "Rangul tău",
       bricks: "cărămizi", bestCombo: "combo", again: "Încă o tură", buy: "Donează o cărămidă", share: "Distribuie",
-      overNote: "Fiecare cărămidă reală ridică școala Beard Brothers, în Florești.", best: "Record", toastCopied: "Link copiat — distribuie!" },
+      overNote: "Fiecare cărămidă reală ridică școala Beard Brothers, în Florești.", best: "Record", toastCopied: "Link copiat — distribuie!",
+      shower: "Ploaie de cărămizi!", dodged: "evitat!" },
     en: { langBtn: "RO", title: "Build the School", sub: "a Beard Brothers game",
       how1: "Drag left–right to catch the bricks", how2: "Keep prejudice, indifference, red tape & stereotypes out", how3: "3 misses and the wall collapses",
       play: "Play", hint: "drag to move the wheelbarrow", scoreLabel: "points", yourRank: "Your rank",
       bricks: "bricks", bestCombo: "combo", again: "Play again", buy: "Donate a brick", share: "Share",
-      overNote: "Every real brick raises the Beard Brothers school in Florești.", best: "Best", toastCopied: "Link copied — share it!" },
+      overNote: "Every real brick raises the Beard Brothers school in Florești.", best: "Best", toastCopied: "Link copied — share it!",
+      shower: "Brick shower!", dodged: "dodged!" },
   };
   // NOTE: `dro`/`den` descriptions are DRAFTS based on the official campaigns
   // page (beard-brothers.ro/campanii). Give them a final proofread with the BB
@@ -94,7 +98,9 @@ export class GameEngine {
   // ---- colors ----
   COL = { skyTop: "#9AD4F0", skyBot: "#CFF0FB", grass: "#7FBF52", grassDk: "#6BAA45", hill: "#8FC962",
     road: "#C7BAA0", roadEdge: "#E7DBC2", dash: "#F4ECD8", brick: "#C0512B", brickTop: "#D9693E", brickSide: "#9A3F20",
+    gold: "#E8A825", goldTop: "#F6C64E", goldSide: "#B87F14",
     wb: "#EE8B3D", wbDk: "#C96A23", wbIn: "#B85F1F", wheel: "#34302C", obst: "#8E8B85", obstDk: "#6E6B66" };
+  CONFETTI = ["#E0701F", "#F2C03D", "#7FBF52", "#3F8FD0", "#C0512B", "#FBF4E6"];
 
   mount(canvas, wrap) {
     this.canvas = canvas;
@@ -105,10 +111,15 @@ export class GameEngine {
     this._onResize = () => { this._resize(); try { this._draw(); } catch (e) {} };
     window.addEventListener("resize", this._onResize);
     this._onKey = (e) => {
-      if (e.key === "ArrowLeft") this.keyDir = -1;
-      else if (e.key === "ArrowRight") this.keyDir = 1;
+      const k = e.key;
+      if (k === "ArrowLeft" || k === "a" || k === "A") this.keyDir = -1;
+      else if (k === "ArrowRight" || k === "d" || k === "D") this.keyDir = 1;
+      else if (k === "Escape" && this.paused) this.resumeBoard();
     };
-    this._onKeyUp = (e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") this.keyDir = 0; };
+    this._onKeyUp = (e) => {
+      const k = e.key;
+      if (k === "ArrowLeft" || k === "ArrowRight" || k === "a" || k === "A" || k === "d" || k === "D") this.keyDir = 0;
+    };
     window.addEventListener("keydown", this._onKey);
     window.addEventListener("keyup", this._onKeyUp);
     this.last = performance.now();
@@ -120,15 +131,23 @@ export class GameEngine {
     window.removeEventListener("keydown", this._onKey);
     window.removeEventListener("keyup", this._onKeyUp);
     clearTimeout(this._tt);
+    this.sfx.dispose();
   }
 
   _setup() {
     this.zNear = 1; this.zFar = 16; this.roadHalf = 3; this.maxX = 2.15;
     this.player = { x: 0 }; this.targetX = 0; this.vx = 0; this.keyDir = 0;
-    this.items = []; this.boards = []; this.particles = [];
+    this.items = []; this.boards = []; this.particles = []; this.scenery = []; this.pops = [];
     this.dashPhase = 0; this.shake = 0; this.bob = 0;
     this.playing = false; this.paused = false; this.campIdx = 0; this.boardSide = 1;
     this.holdZ = 2.5; this.boardCooldown = 0.3;
+    this.scenerySide = 1; this.sceneryTimer = 0.1;
+    // slow drifting clouds (fractions of the viewport, resolution independent)
+    this.clouds = [
+      { fx: 0.16, fy: 0.30, s: 1.0, v: 0.006 },
+      { fx: 0.55, fy: 0.14, s: 1.5, v: 0.004 },
+      { fx: 0.86, fy: 0.42, s: 0.8, v: 0.008 },
+    ];
     this._resetRun();
     // pre-seed a couple of drifting boards for the attract screen
     this.spawnTimer = 0.6; this.boardTimer = 0.2;
@@ -140,7 +159,18 @@ export class GameEngine {
     this.lives = d === "easy" ? 4 : 3; this.maxLives = this.lives;
     this.score = 0; this.combo = 0; this.comboMult = 1; this.bestCombo = 0; this.bricksCaught = 0;
     this.speed = this.baseSpeed; this.comboTimer = 0; this.player.x = 0; this.targetX = 0;
-    this.items.length = 0; this.particles.length = 0;
+    this.items.length = 0; this.particles.length = 0; this.pops.length = 0;
+    // juice / progression state
+    this.elapsed = 0;          // run time — drives the difficulty ramp
+    this.flash = 0;            // red damage vignette
+    this.catchPulse = 0;       // barrow squash on catch
+    this.dying = 0;            // slow-mo "wall collapses" beat before game-over
+    this.showerT = 0;          // rank-up reward: seconds of brick-only rapid spawns
+    this.banner = null;        // {t, rankIdx} — canvas rank-up banner
+    this.runRankIdx = 0;       // last rank threshold crossed this run
+    this._bricksSinceHeart = 0;
+    this._lastSpawnX = 0; this._lastItv = 1; this._pat = null;
+    this._hintGone = false; this._lastBarBricks = -1; this._lastBarLang = null;
   }
 
   _resize() {
@@ -190,7 +220,8 @@ export class GameEngine {
 
   // ---- input ----
   onDown = (e) => {
-    if (this.paused || !this.playing) return;
+    this.sfx.unlock(); // any first touch satisfies the autoplay policy
+    if (this.paused || !this.playing || this.dying > 0) return;
     this.dragging = true; this._moved = false;
     this._downX = e.clientX; this._downY = e.clientY;
     this._dragStartClientX = e.clientX; this._dragStartTargetX = this.targetX;
@@ -206,7 +237,7 @@ export class GameEngine {
   onUp = () => {
     const wasDrag = this._moved;
     this.dragging = false;
-    if (!this.playing || this.paused) return;
+    if (!this.playing || this.paused || this.dying > 0) return;
     // a tap (no drag) on the billboard currently held in view opens it
     if (!wasDrag) {
       const b = this._heldBoardAt(this._downX, this._downY);
@@ -230,10 +261,12 @@ export class GameEngine {
   }
   openBoard(b) {
     this.paused = true; this.dragging = false;
+    this.sfx.board();
     this.onBoard(b.cm);
   }
   resumeBoard = () => {
     this.paused = false;
+    this.sfx.ui();
     this.onBoard(null);
   };
 
@@ -264,9 +297,11 @@ export class GameEngine {
   }
 
   startGame = () => {
+    this.sfx.unlock();
     this._resetRun();
     this.playing = true;
     this.spawnTimer = 0.5; this.boardTimer = 1.2;
+    if (this.hud.hint) this.hud.hint.style.opacity = "1";
     this.onScreen("playing");
   };
   _gameOver() {
@@ -277,30 +312,76 @@ export class GameEngine {
     for (let i = 0; i < this.RANKS.length; i++) if (this.bricksCaught >= this.RANKS[i].min) rkIdx = i;
     // Record is tracked in BRICKS so it matches the rank/share story (which both
     // speak in bricks), not in raw points.
+    // A first-ever run only celebrates from 25 bricks up, so "record" keeps meaning.
+    const isRecord = this.bricksCaught > this.best && (this.best > 0 || this.bricksCaught >= 25);
     const best = Math.max(this.best, this.bricksCaught);
     this.best = best;
     try { localStorage.setItem("bbwb_best_bricks", String(best)); } catch (e) {}
     this.finalScore = this.score; this.finalBricks = this.bricksCaught; this.finalCombo = this.bestCombo;
+    if (isRecord) { this.sfx.record(); this._confetti(70); }
     this.onScreen("over", {
       finalScore: this.score, finalBricks: this.bricksCaught, finalCombo: this.bestCombo,
-      rankIdx: rkIdx, best,
+      rankIdx: rkIdx, best, isRecord,
     });
   }
 
   // ---- spawning ----
-  _spawnItem() {
-    const obFreq = Math.min(0.16 + this.score / 4000, 0.32);
-    const isOb = Math.random() < obFreq;
+  // `itv` is the seconds until the NEXT spawn — items all fall at the same speed,
+  // so it is also the arrival gap at the catch line. The next x is clamped to the
+  // distance the barrow can actually cover in that gap, so the spawner can never
+  // produce an unreachable brick (a "cheap" strike).
+  _spawnItem(itv) {
     const half = this._spawnHalf || this.roadHalf - 0.55;
-    const x = (Math.random() * 2 - 1) * half;
+    const shower = this.showerT > 0;
+    const obFreq = shower ? 0 : Math.min(0.16 + this.bricksCaught / 260, 0.32);
+    const isOb = Math.random() < obFreq;
+
+    // pattern generator: short designed sequences read better than pure noise
+    if (!this._pat || this._pat.n <= 0) {
+      const r = Math.random();
+      if (r < 0.25) this._pat = { kind: "zig", dir: Math.random() < 0.5 ? 1 : -1, n: 3 + ((Math.random() * 2) | 0) };
+      else if (r < 0.45) this._pat = { kind: "run", x: (Math.random() * 2 - 1) * half, n: 3 };
+      else this._pat = { kind: "rnd", n: 2 + ((Math.random() * 3) | 0) };
+    }
+    const pat = this._pat; pat.n--;
+    let x;
+    if (pat.kind === "zig") { x = this._lastSpawnX + pat.dir * (1.0 + Math.random() * 0.8); pat.dir *= -1; }
+    else if (pat.kind === "run") x = pat.x + (Math.random() * 0.6 - 0.3);
+    else x = (Math.random() * 2 - 1) * half;
+
+    // reachability clamp (~3 world units/s of realistic barrow travel)
+    const reach = Math.max(1.1, 3.0 * (itv || 1));
+    x = Math.max(this._lastSpawnX - reach, Math.min(this._lastSpawnX + reach, x));
+    x = Math.max(-half, Math.min(half, x));
+    this._lastSpawnX = x;
+
+    // heart pickup: a comeback beat, only when hurt and earned (~25 bricks apart)
+    if (!shower && this.lives < this.maxLives && this._bricksSinceHeart >= 22 &&
+        !this.items.some((i) => i.heart) && Math.random() < 0.14) {
+      this._bricksSinceHeart = 0;
+      this.items.push({ x, z: this.zFar, heart: true, done: false, hop: Math.random() * 0.4 });
+      return;
+    }
     if (isOb) {
       const arr = this.OBST[this._lang];
       // store the obstacle INDEX, not the localized string, so the label
       // re-translates live if the player toggles language mid-run.
       this.items.push({ x, z: this.zFar, ob: true, obIdx: (Math.random() * arr.length) | 0, done: false, hop: 0 });
     } else {
-      this.items.push({ x, z: this.zFar, ob: false, done: false, hop: Math.random() * 0.4 });
+      // golden brick: rare 5× jackpot once the player has found their feet
+      const gold = this.bricksCaught >= 8 && Math.random() < (shower ? 0.1 : 0.06);
+      this.items.push({ x, z: this.zFar, ob: false, gold, done: false, hop: Math.random() * 0.4 });
     }
+  }
+  _spawnScenery() {
+    this.scenerySide *= -1;
+    const off = this.roadHalf + 0.9 + Math.random() * 2.4;
+    this.scenery.push({
+      z: this.zFar + 2, side: this.scenerySide, off,
+      kind: Math.random() < 0.4 ? "tree" : "bush",
+      seed: Math.random(),
+    });
+    if (this.scenery.length > 40) this.scenery.shift();
   }
   _spawnBoard() {
     const cm = this.CAMPS[this.campIdx % this.CAMPS.length];
@@ -319,19 +400,47 @@ export class GameEngine {
 
   _update(dt) {
     if (this.paused) return; // frozen while a billboard is open for reading
+    // slow-mo "wall collapses" beat: the world runs at 35% while the real-time
+    // timer counts down, then the game-over screen lands.
+    if (this.dying > 0) {
+      this.dying -= dt;
+      if (this.dying <= 0) { this.dying = 0; this._gameOver(); return; }
+      dt *= 0.35;
+    }
     // movement
     if (this.playing) {
-      if (this.keyDir) this.targetX = Math.max(-this.maxX, Math.min(this.maxX, this.targetX + this.keyDir * dt * 4.2));
+      this.elapsed += dt;
+      if (this.keyDir) {
+        const kv = 4.2 * (this.speed / this.baseSpeed); // keyboard keeps pace late-game
+        this.targetX = Math.max(-this.maxX, Math.min(this.maxX, this.targetX + this.keyDir * dt * kv));
+      }
       const nx = this.player.x + (this.targetX - this.player.x) * Math.min(1, dt * 11);
       this.vx = (nx - this.player.x) / Math.max(dt, 0.001);
       this.player.x = nx;
-      this.speed = this.baseSpeed + Math.min(this.score / 120, 7);
+      // Ramp by bricks + time, NOT score: combo multipliers inflate score, which
+      // used to max the speed out ~40s into a run and then plateau. This curve
+      // starts 12% gentler (first 12s) and keeps climbing to a higher ceiling.
+      this.speed = this.baseSpeed * (0.88 + 0.12 * Math.min(1, this.elapsed / 12))
+        + Math.min(this.bricksCaught * 0.10, 4.2)
+        + Math.min(this.elapsed * 0.022, 1.9);
     }
     const spd = this.playing ? this.speed : this.baseSpeed * 0.7;
     this.dashPhase = (this.dashPhase + spd * dt) % 2.4;
     this.bob += dt;
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 30);
     if (this.comboTimer > 0) this.comboTimer -= dt;
+    if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 1.8);
+    if (this.catchPulse > 0) this.catchPulse = Math.max(0, this.catchPulse - dt * 5);
+    if (this.showerT > 0) this.showerT -= dt;
+    if (this.banner && (this.banner.t -= dt) <= 0) this.banner = null;
+
+    // clouds drift with a whisper of the world speed
+    for (const cl of this.clouds) { cl.fx += cl.v * dt * (0.4 + spd * 0.08); if (cl.fx > 1.18) cl.fx = -0.18; }
+    // roadside scenery flows past (also on the attract screen — a living world)
+    for (const s of this.scenery) s.z -= spd * dt;
+    this.scenery = this.scenery.filter((s) => s.z > 0.4);
+    this.sceneryTimer -= dt;
+    if (this.sceneryTimer <= 0) { this._spawnScenery(); this.sceneryTimer = 0.55 + Math.random() * 0.5; }
 
     // boards: approach -> hold in full view 2s -> leave, one at a time
     for (const b of this.boards) {
@@ -347,43 +456,134 @@ export class GameEngine {
     // items only in play
     if (this.playing) {
       this.spawnTimer -= dt;
-      if (this.spawnTimer <= 0) { this._spawnItem(); this.spawnTimer = Math.max(0.5, 1.15 - this.score / 2600); }
+      if (this.spawnTimer <= 0) {
+        let itv = Math.max(0.48, 1.05 - this.bricksCaught * 0.004 - this.elapsed * 0.003);
+        if (this.showerT > 0) itv = Math.max(0.26, itv * 0.45);
+        // clamp reachability by the TIGHTER of the gap that just elapsed and the
+        // next one (matters at shower boundaries, where the cadence jumps)
+        this._spawnItem(Math.min(this._lastItv || itv, itv));
+        this.spawnTimer = itv; this._lastItv = itv;
+      }
       for (const it of this.items) {
         it.z -= this.speed * dt;
+        // golden bricks trail sparkles on the way down
+        if (it.gold && !it.done && !this.reduceMotion && Math.random() < 0.25) {
+          const gp = this.project(it.x, it.z, 0.3);
+          if (gp.p > 0.1) this.particles.push({
+            x: gp.sx + (Math.random() - 0.5) * 14, y: gp.sy - Math.random() * 10,
+            vx: (Math.random() - 0.5) * 24, vy: -18 - Math.random() * 30, g: 60,
+            life: 0.35, c: "#F6C64E", s: 2.5 + Math.random() * 2,
+          });
+        }
         if (!it.done && it.z <= this.zNear + 0.05) {
           it.done = true;
           const reach = Math.abs(it.x - this.player.x) < 1.0;
-          if (it.ob) {
+          if (it.heart) {
+            if (reach) {
+              this.lives = Math.min(this.maxLives, this.lives + 1);
+              this._pop(this.player.x, "+1 ♥", "#E0413B", 1.15);
+              this._burst(this.player.x, "#E88579");
+              this.sfx.heart(); this._vib(20);
+            }
+            // a missed heart costs nothing
+          } else if (it.ob) {
             if (reach) { this._hit(); this._burst(it.x, "#8E8B85"); }
-            else { this.score += 3; }
+            else {
+              this.score += 3;
+              // near-miss → make the dodge reward felt, not silent
+              if (Math.abs(it.x - this.player.x) < 1.9) { this._pop(it.x, "+3", "#77746D", 0.8); this.sfx.dodge(); }
+            }
           } else {
             if (reach) {
-              this.bricksCaught++; this.combo++; this.bestCombo = Math.max(this.bestCombo, this.combo);
+              this.bricksCaught++; this.combo++; this._bricksSinceHeart++;
+              this.bestCombo = Math.max(this.bestCombo, this.combo);
               const prevMult = this.comboMult;
               // multiplier = +1 every 4 consecutive catches, capped at ×10
               this.comboMult = Math.min(1 + Math.floor(this.combo / 4), 10);
-              this.score += 12 * this.comboMult;
-              this._burst(this.player.x, "#E0701F");
+              const gain = (it.gold ? 60 : 12) * this.comboMult;
+              this.score += gain;
+              this._pop(this.player.x, "+" + gain, it.gold ? "#D9910F" : "#E0701F", it.gold ? 1.3 : 1);
+              this._burst(this.player.x, it.gold ? "#F6C64E" : "#E0701F");
+              this.catchPulse = 1;
+              if (it.gold) this.sfx.golden(); else this.sfx.pop(this.combo);
+              this._vib(12);
               // pop the combo popup once per new multiplier tier, then let it fade
               // (don't keep re-triggering every catch, which made "x2" linger).
               if (this.comboMult > 1 && this.comboMult !== prevMult) { this.comboTimer = 1.1; this._showCombo(); }
+              // rank threshold crossed → celebration + brick-shower reward
+              const nr = this.runRankIdx + 1;
+              if (nr < this.RANKS.length && this.bricksCaught >= this.RANKS[nr].min) { this.runRankIdx = nr; this._rankUp(nr); }
             } else { this._hit(); }
           }
         }
       }
       this.items = this.items.filter((it) => it.z > 0.5);
+      // dust kicked up when the barrow zips sideways
+      if (!this.reduceMotion && Math.abs(this.vx) > 3.5 && Math.random() < 0.3) {
+        this.particles.push({
+          x: this.cx + this.player.x * this.K - Math.sign(this.vx) * this.W * 0.06,
+          y: this.H * 0.93 + Math.random() * 8,
+          vx: -this.vx * 5 + (Math.random() - 0.5) * 30, vy: -40 - Math.random() * 50, g: 500,
+          life: 0.4, c: "#D8CBB0", s: 3 + Math.random() * 3,
+        });
+      }
     }
 
-    // particles
-    for (const p of this.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 900 * dt; p.life -= dt; }
+    // particles (p.g lets confetti/dust fall slower than impact bursts)
+    for (const p of this.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.g == null ? 900 : p.g) * dt; p.life -= dt; }
     this.particles = this.particles.filter((p) => p.life > 0);
+    // floating score popups
+    for (const p of this.pops) { p.y += p.vy * dt; p.life -= dt; }
+    this.pops = this.pops.filter((p) => p.life > 0);
 
     this._updateHud();
   }
 
   _hit() {
-    this.lives--; this.combo = 0; this.comboMult = 1; this.shake = this.reduceMotion ? 0 : 9;
-    if (this.lives <= 0) this._gameOver();
+    if (this.dying > 0) return;
+    this.lives--; this.combo = 0; this.comboMult = 1;
+    if (this.lives <= 0) {
+      this.lives = 0;
+      this.shake = this.reduceMotion ? 0 : 16;
+      this.flash = 0.55;
+      this.sfx.death(); this._vib([60, 50, 90]);
+      this.dying = 0.85; // slow-mo beat; _update fires _gameOver() when it runs out
+    } else {
+      this.shake = this.reduceMotion ? 0 : 9;
+      this.flash = 0.35;
+      this.sfx.thud(); this._vib(60);
+    }
+  }
+  _rankUp(idx) {
+    this.showerT = 4; // reward: 4s of rapid, boulder-free bricks
+    this.banner = { t: 2.2, rankIdx: idx };
+    this.sfx.rankUp(); this._vib([30, 40, 30]);
+    this._confetti(36);
+    this.onEvent("rank_up", { rank: this.RANKS[idx].en[0], bricks: this.bricksCaught });
+  }
+  _confetti(n) {
+    if (this.reduceMotion) return;
+    for (let i = 0; i < n; i++) {
+      this.particles.push({
+        x: Math.random() * this.W, y: -12 - Math.random() * this.H * 0.25,
+        vx: (Math.random() - 0.5) * 70, vy: 60 + Math.random() * 130, g: 260,
+        life: 1.1 + Math.random() * 0.9, c: this.CONFETTI[(Math.random() * this.CONFETTI.length) | 0],
+        s: 4 + Math.random() * 5,
+      });
+    }
+  }
+  _vib(pattern) {
+    if (this.reduceMotion) return;
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+  }
+  // floating score text at the catch line
+  _pop(worldX, txt, c, scale = 1) {
+    const p = this.project(worldX, this.zNear + 0.1, 0.6);
+    this.pops.push({
+      x: p.sx, y: p.sy, vy: this.reduceMotion ? 0 : -48,
+      life: 0.9, max: 0.9, txt, c, sz: Math.max(15, this.W * 0.045) * scale,
+    });
+    if (this.pops.length > 12) this.pops.shift();
   }
   _burst(worldX, color) {
     if (this.reduceMotion) return;
@@ -412,6 +612,25 @@ export class GameEngine {
       if (this.comboMult > 1) { this.hud.mult.textContent = "×" + this.comboMult; this.hud.mult.style.opacity = "1"; }
       else this.hud.mult.style.opacity = "0";
     }
+    // rank progress bar — imperative, only touched when the values change
+    if (this.hud.rankBar && this.hud.rankLabel &&
+        (this.bricksCaught !== this._lastBarBricks || this._lang !== this._lastBarLang)) {
+      this._lastBarBricks = this.bricksCaught; this._lastBarLang = this._lang;
+      const cur = this.RANKS[this.runRankIdx], next = this.RANKS[this.runRankIdx + 1];
+      if (next) {
+        const pct = Math.max(0, Math.min(1, (this.bricksCaught - cur.min) / (next.min - cur.min)));
+        this.hud.rankBar.style.width = (pct * 100).toFixed(1) + "%";
+        this.hud.rankLabel.textContent = "→ " + next[this._lang][0];
+      } else {
+        this.hud.rankBar.style.width = "100%";
+        this.hud.rankLabel.textContent = "★ " + cur[this._lang][0];
+      }
+    }
+    // retire the drag hint once the player clearly has the hang of it
+    if (!this._hintGone && this.bricksCaught >= 3 && this.hud.hint) {
+      this._hintGone = true;
+      this.hud.hint.style.opacity = "0";
+    }
   }
 
   // ---- drawing ----
@@ -422,6 +641,22 @@ export class GameEngine {
     if (this.shake > 0) ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
     // sky (gradient cached in _resize)
     ctx.fillStyle = this._skyGrad; ctx.fillRect(-20, -20, W + 40, this.horizon + 60);
+    // sun with a soft halo
+    const sunX = W * 0.14, sunY = this.horizon * 0.36, sunR = Math.max(16, W * 0.042);
+    ctx.fillStyle = "rgba(255,241,178,.4)";
+    ctx.beginPath(); ctx.arc(sunX, sunY, sunR * 1.9, 0, 7); ctx.fill();
+    ctx.fillStyle = "#FFE9A8";
+    ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, 7); ctx.fill();
+    // drifting clouds
+    ctx.fillStyle = "rgba(255,255,255,.85)";
+    for (const cl of this.clouds) {
+      const ccx = cl.fx * W, ccy = cl.fy * this.horizon, cs = Math.max(13, W * 0.03) * cl.s;
+      ctx.beginPath();
+      ctx.ellipse(ccx, ccy, cs * 1.6, cs * 0.6, 0, 0, 7);
+      ctx.ellipse(ccx - cs, ccy + cs * 0.2, cs * 0.9, cs * 0.48, 0, 0, 7);
+      ctx.ellipse(ccx + cs, ccy + cs * 0.22, cs, cs * 0.52, 0, 0, 7);
+      ctx.fill();
+    }
     // grass
     ctx.fillStyle = this.COL.grass; ctx.fillRect(-20, this.horizon - 1, W + 40, H - this.horizon + 40);
     // distant hill band
@@ -432,6 +667,9 @@ export class GameEngine {
     ctx.lineTo(W + 20, this.horizon + 10); ctx.lineTo(-20, this.horizon + 10); ctx.closePath(); ctx.fill();
 
     this._drawRoad();
+    // roadside scenery far->near (behind boards & items)
+    const sc = this.scenery.slice().sort((a, b) => b.z - a.z);
+    for (const s of sc) this._drawScenery(s);
     // boards far->near
     const bs = this.boards.slice().sort((a, b) => b.z - a.z);
     for (const b of bs) this._drawBoard(b);
@@ -445,6 +683,75 @@ export class GameEngine {
       ctx.fillStyle = p.c; ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
     }
     ctx.globalAlpha = 1;
+    // floating score popups
+    if (this.pops.length) {
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (const p of this.pops) {
+        ctx.globalAlpha = Math.max(0, Math.min(1, (p.life / p.max) * 1.6));
+        ctx.font = "700 " + p.sz + "px 'Baloo 2', sans-serif";
+        ctx.fillStyle = "rgba(43,42,40,.4)"; ctx.fillText(p.txt, p.x + 1.5, p.y + 2);
+        ctx.fillStyle = p.c; ctx.fillText(p.txt, p.x, p.y);
+      }
+      ctx.globalAlpha = 1;
+    }
+    // rank-up banner (rank resolved at draw time so it re-translates live)
+    if (this.banner) {
+      const bn = this.banner, born = 2.2 - bn.t;
+      const a = Math.min(1, born / 0.15, bn.t / 0.4);
+      const s = this.reduceMotion ? 1 : 0.7 + 0.3 * Math.min(1, born / 0.22);
+      const fs = Math.min(34, W * 0.082);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.translate(this.cx, H * 0.3);
+      ctx.scale(s, s);
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+      const title = this.RANKS[bn.rankIdx][this._lang][0] + "!";
+      ctx.font = "700 " + fs + "px 'Baloo 2', sans-serif";
+      ctx.lineWidth = fs * 0.18; ctx.strokeStyle = "rgba(43,42,40,.9)";
+      ctx.strokeText(title, 0, 0);
+      ctx.fillStyle = "#FFD98A";
+      ctx.fillText(title, 0, 0);
+      const sub = this.STR[this._lang].shower;
+      ctx.font = "700 " + fs * 0.5 + "px 'Baloo 2', sans-serif";
+      ctx.lineWidth = fs * 0.11;
+      ctx.strokeText(sub, 0, fs * 0.98);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(sub, 0, fs * 0.98);
+      ctx.restore();
+    }
+    // damage vignette
+    if (this.flash > 0) {
+      ctx.fillStyle = "rgba(196,52,32," + (this.flash * 0.5).toFixed(3) + ")";
+      ctx.fillRect(-30, -30, W + 60, H + 60);
+    }
+    ctx.restore();
+  }
+  _drawScenery(s) {
+    const ctx = this.ctx;
+    const base = this.project(s.side * s.off, s.z, 0);
+    if (base.p <= 0.04) return;
+    const k = this.K * base.p;
+    const fade = Math.max(0, Math.min(1, (this.zFar + 2 - s.z) / 3));
+    ctx.save();
+    ctx.globalAlpha = fade;
+    if (s.kind === "tree") {
+      const th = k * (1.0 + s.seed * 0.5), tw = Math.max(1.5, k * 0.09);
+      ctx.fillStyle = "#8A6A42";
+      ctx.fillRect(base.sx - tw / 2, base.sy - th, tw, th);
+      ctx.fillStyle = s.seed > 0.6 ? "#4E8C33" : "#5FA23E";
+      ctx.beginPath();
+      ctx.arc(base.sx, base.sy - th, k * 0.4, 0, 7);
+      ctx.arc(base.sx - k * 0.25, base.sy - th + k * 0.17, k * 0.28, 0, 7);
+      ctx.arc(base.sx + k * 0.25, base.sy - th + k * 0.17, k * 0.28, 0, 7);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = s.seed > 0.5 ? "#58983A" : "#63A843";
+      ctx.beginPath();
+      ctx.arc(base.sx - k * 0.16, base.sy - k * 0.1, k * 0.19, 0, 7);
+      ctx.arc(base.sx + k * 0.15, base.sy - k * 0.12, k * 0.23, 0, 7);
+      ctx.arc(base.sx, base.sy - k * 0.04, k * 0.21, 0, 7);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -641,7 +948,23 @@ export class GameEngine {
     const fade = Math.max(0, Math.min(1, (this.zFar - it.z) / 2));
     ctx.save();
     ctx.globalAlpha = fade;
-    if (it.ob) {
+    if (it.heart) {
+      // life pickup — beating heart with a soft glow
+      const hs = 0.5 * sc * (1 + Math.sin(this.bob * 6) * 0.08);
+      const hx = pr.sx, hy = pr.sy - hs * 0.45;
+      ctx.fillStyle = "rgba(0,0,0,.12)";
+      ctx.beginPath(); ctx.ellipse(pr.sx, pr.sy + 2, hs * 0.6, hs * 0.22, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = "rgba(224,65,59,.18)";
+      ctx.beginPath(); ctx.arc(hx, hy, hs * 0.85, 0, 7); ctx.fill();
+      ctx.fillStyle = "#E0413B";
+      ctx.beginPath();
+      ctx.moveTo(hx, hy + hs * 0.34);
+      ctx.bezierCurveTo(hx - hs * 0.52, hy - hs * 0.04, hx - hs * 0.19, hy - hs * 0.42, hx, hy - hs * 0.12);
+      ctx.bezierCurveTo(hx + hs * 0.19, hy - hs * 0.42, hx + hs * 0.52, hy - hs * 0.04, hx, hy + hs * 0.34);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.4)";
+      ctx.beginPath(); ctx.ellipse(hx - hs * 0.16, hy - hs * 0.16, hs * 0.1, hs * 0.06, -0.6, 0, 7); ctx.fill();
+    } else if (it.ob) {
       // grey boulder of prejudice
       const r = 0.42 * sc;
       ctx.fillStyle = "rgba(0,0,0,.14)";
@@ -657,21 +980,33 @@ export class GameEngine {
         ctx.fillText(label, pr.sx, pr.sy - r * 0.7);
       }
     } else {
-      // isometric brick
+      // isometric brick (golden variant is the 5× jackpot)
       const w = 0.62 * sc, h = 0.4 * sc, d = 0.28 * sc;
       const x = pr.sx, y = pr.sy;
       // shadow
       ctx.fillStyle = "rgba(0,0,0,.13)";
       ctx.beginPath(); ctx.ellipse(x, y + 2, w * 0.7, h * 0.28, 0, 0, 7); ctx.fill();
       // front
-      ctx.fillStyle = this.COL.brick;
+      ctx.fillStyle = it.gold ? this.COL.gold : this.COL.brick;
       ctx.fillRect(x - w / 2, y - h, w, h);
       // right side
-      ctx.fillStyle = this.COL.brickSide;
+      ctx.fillStyle = it.gold ? this.COL.goldSide : this.COL.brickSide;
       ctx.beginPath(); ctx.moveTo(x + w / 2, y - h); ctx.lineTo(x + w / 2 + d, y - h - d); ctx.lineTo(x + w / 2 + d, y - d); ctx.lineTo(x + w / 2, y); ctx.closePath(); ctx.fill();
       // top
-      ctx.fillStyle = this.COL.brickTop;
+      ctx.fillStyle = it.gold ? this.COL.goldTop : this.COL.brickTop;
       ctx.beginPath(); ctx.moveTo(x - w / 2, y - h); ctx.lineTo(x - w / 2 + d, y - h - d); ctx.lineTo(x + w / 2 + d, y - h - d); ctx.lineTo(x + w / 2, y - h); ctx.closePath(); ctx.fill();
+      if (it.gold) {
+        // moving glint stripe across the front face
+        ctx.save();
+        ctx.beginPath(); ctx.rect(x - w / 2, y - h, w, h); ctx.clip();
+        const gx = x - w / 2 + ((this.bob * 40) % (w + 12)) - 6;
+        ctx.fillStyle = "rgba(255,255,255,.55)";
+        ctx.beginPath();
+        ctx.moveTo(gx, y); ctx.lineTo(gx + w * 0.14, y);
+        ctx.lineTo(gx + w * 0.3, y - h); ctx.lineTo(gx + w * 0.16, y - h);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
     }
     ctx.restore();
   }
@@ -685,6 +1020,8 @@ export class GameEngine {
     ctx.save();
     ctx.translate(cxp, baseY);
     ctx.rotate(tilt);
+    // squash & stretch on catch
+    if (this.catchPulse > 0) ctx.scale(1 + this.catchPulse * 0.05, 1 - this.catchPulse * 0.07);
     // ground shadow
     ctx.fillStyle = "rgba(0,0,0,.16)";
     ctx.beginPath(); ctx.ellipse(0, wh * 0.55, ww * 0.5, wh * 0.16, 0, 0, 7); ctx.fill();
@@ -713,6 +1050,25 @@ export class GameEngine {
     ctx.fillStyle = this.COL.wbIn;
     ctx.beginPath();
     ctx.ellipse(0, -tH / 2 + tH * 0.08, topW * 0.46, tH * 0.16, 0, 0, 7); ctx.fill();
+    // the load: caught bricks visibly pile up into a jumbled mound over the run
+    const loadN = this.bricksCaught > 0 ? Math.min(9, 1 + Math.floor(this.bricksCaught / 3)) : 0;
+    if (loadN > 0) {
+      const bw = topW * 0.16, bh = tH * 0.17;
+      for (let i = 0; i < loadN; i++) {
+        const fr = (((i + 1) * 2654435761) % 97) / 97 - 0.5;  // stable pseudo-random spread
+        const fr2 = (((i + 3) * 1597334677) % 89) / 89;
+        const lx = fr * topW * 0.56;
+        const ly = -tH / 2 + tH * 0.08 - (i % 3) * bh * 0.45 - fr2 * bh * 0.35;
+        ctx.save();
+        ctx.translate(lx, ly);
+        ctx.rotate((fr2 - 0.5) * 0.35);
+        ctx.fillStyle = i % 2 ? "#C0512B" : "#D6663C";
+        ctx.fillRect(-bw / 2, -bh, bw, bh);
+        ctx.fillStyle = "rgba(255,255,255,.16)";
+        ctx.fillRect(-bw / 2, -bh, bw, bh * 0.3);
+        ctx.restore();
+      }
+    }
     // rim highlight
     ctx.strokeStyle = "#FFC089"; ctx.lineWidth = Math.max(2, ww * 0.022);
     ctx.beginPath(); ctx.moveTo(-topW / 2, -tH / 2); ctx.lineTo(topW / 2, -tH / 2); ctx.stroke();

@@ -68,6 +68,15 @@
         0% { transform: translateY(16px); opacity: 0; }
         100% { transform: translateY(0); opacity: 1; }
       }
+      @keyframes bbStarPop {
+        0% { transform: scale(0); opacity: 0; }
+        60% { transform: scale(1.35); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      /* tactile press feedback on every button */
+      button:active {
+        transform: translateY(1px) scale(0.99);
+      }
       :focus-visible {
         outline: 3px solid #1c2b33;
         outline-offset: 2px;
