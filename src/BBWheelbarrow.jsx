@@ -57,6 +57,29 @@ function BrickWall({ n }) {
   );
 }
 
+// "a RainbowApps project" signature — light-background variant from the official
+// badge kit (Rainbow Engineering brand assets); only font-family adapted to the
+// app's Nunito, as the kit allows. Logo colors are fixed brand colors.
+const RAINBOW = ["#E2574C", "#F0933D", "#EFC23F", "#55A45E", "#3FA39B", "#4E7FD0", "#8B66C6"];
+const RAINBOW_POS = [[30, 106], [39.1, 72], [64, 47.1], [98, 38], [132, 47.1], [156.9, 72], [166, 106]];
+function RainbowBadge({ lang }) {
+  return (
+    <a
+      href="https://www.rainbowapps.org" target="_blank" rel="noopener noreferrer"
+      onClick={() => track("rainbowapps_badge_click")}
+      style={{ display: "inline-flex", alignItems: "center", gap: 9, fontFamily: NUN, fontWeight: 600, fontSize: 13, color: "#6E675C", textDecoration: "none" }}
+    >
+      <svg viewBox="24 32 172 104" width="27" aria-hidden="true" style={{ display: "block" }}>
+        <polyline points="42,118 51.1,84 76,59.1 110,50 144,59.1 168.9,84 178,118" fill="none" stroke="#DAD3C6" strokeWidth="2.5" />
+        {RAINBOW_POS.map(([x, y], i) => <rect key={i} x={x} y={y} width="24" height="24" rx="7.5" fill={RAINBOW[i]} />)}
+      </svg>
+      {lang === "ro"
+        ? <span>un proiect <strong style={{ fontWeight: 800, color: "#2B2723" }}>RainbowApps</strong></span>
+        : <span>a <strong style={{ fontWeight: 800, color: "#2B2723" }}>RainbowApps</strong> project</span>}
+    </a>
+  );
+}
+
 // Baloo 2 — chunky rounded display face with full, correctly-weighted Romanian
 // comma-below diacritics (ș/ț), unlike Fredoka whose extended glyphs look thin.
 const FRED = "'Baloo 2', sans-serif";
@@ -255,6 +278,7 @@ export default function BBWheelbarrow({ difficulty = "normal", defaultLang = "ro
             </div>
             <button ref={primaryBtnRef} onClick={() => e() && e().startGame()} style={{ width: "100%", border: "none", cursor: "pointer", fontFamily: FRED, fontWeight: 700, fontSize: 21, color: "#fff", background: "linear-gradient(#F08C3E,#E0701F)", borderRadius: 16, padding: 16, boxShadow: "0 6px 0 #B6541A,0 10px 20px rgba(224,112,31,.4)" }}>{t.play}</button>
             <div style={{ marginTop: 14, fontSize: 13, fontWeight: 700, color: "#6F6452" }}>{bestLine}</div>
+            <div style={{ marginTop: bestLine ? 10 : 2 }}><RainbowBadge lang={lang} /></div>
           </div>
         </div>
       )}
